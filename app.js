@@ -452,7 +452,7 @@ const App = {
         <div class="team-list-dot" style="background:${t.colour || '#888'};border-color:${t.colour || '#888'}"></div>
         <div class="list-item-body">
           <div class="list-item-title">${t.name}</div>
-          <div class="list-item-sub" style="color:${t.colour || 'var(--text2)'}">&#9632; ${t.colour || 'No colour'}</div>
+          <div class="list-item-sub">${t.homeground ? '&#x1F3DF; ' + t.homeground : '<span style="color:var(--text2)">' + (t.colour || 'No colour') + '</span>'}</div>
         </div>
         <div class="list-chevron">›</div>
       </div>`).join('');
@@ -464,20 +464,23 @@ const App = {
   },
 
   prefillTeamForm() {
-    const nameEl   = document.getElementById('team-name');
-    const colourEl = document.getElementById('team-colour');
-    const titleEl  = document.querySelector('#screen-new-team .topbar h1');
-    const delBtn   = document.getElementById('team-delete-btn');
+    const nameEl      = document.getElementById('team-name');
+    const groundEl    = document.getElementById('team-homeground');
+    const colourEl    = document.getElementById('team-colour');
+    const titleEl     = document.querySelector('#screen-new-team .topbar h1');
+    const delBtn      = document.getElementById('team-delete-btn');
 
     if (this.editingTeamId) {
       const t = State.getTeam(this.editingTeamId);
       if (!t) return;
-      if (nameEl)   nameEl.value   = t.name   || '';
-      if (colourEl) colourEl.value = t.colour || '#4a9eff';
+      if (nameEl)   nameEl.value   = t.name       || '';
+      if (groundEl) groundEl.value = t.homeground || '';
+      if (colourEl) colourEl.value = t.colour     || '#4a9eff';
       if (titleEl)  titleEl.textContent = 'Edit Team';
       if (delBtn)   delBtn.classList.remove('hidden');
     } else {
       if (nameEl)   nameEl.value   = '';
+      if (groundEl) groundEl.value = '';
       if (colourEl) colourEl.value = '#4a9eff';
       if (titleEl)  titleEl.textContent = 'New Team';
       if (delBtn)   delBtn.classList.add('hidden');
@@ -515,15 +518,16 @@ const App = {
   },
 
   saveTeam() {
-    const name   = (document.getElementById('team-name')?.value || '').trim();
-    const colour = document.getElementById('team-colour')?.value || '#4a9eff';
+    const name       = (document.getElementById('team-name')?.value       || '').trim();
+    const homeground = (document.getElementById('team-homeground')?.value || '').trim();
+    const colour     = document.getElementById('team-colour')?.value || '#4a9eff';
     if (!name) { this.toast('Please enter a team name'); return; }
 
     if (this.editingTeamId) {
-      State.updateTeam(this.editingTeamId, { name, colour });
+      State.updateTeam(this.editingTeamId, { name, homeground, colour });
       this.toast('Team updated');
     } else {
-      State.addTeam({ name, colour });
+      State.addTeam({ name, homeground, colour });
       this.toast('Team added');
     }
     this.editingTeamId = null;
@@ -561,10 +565,35 @@ const App = {
       if (team) {
         if (input) input.value = team.name;
         if (dot)  { dot.style.background = team.colour; dot.style.borderColor = team.colour; }
+        // Auto-fill venue from home team's homeground
+        if (side === 'home') this._updateVenueSuggestion(team);
       }
     } else {
       if (dot) { dot.style.background = 'transparent'; dot.style.borderColor = 'var(--border)'; }
+      if (side === 'home') this._updateVenueSuggestion(null);
     }
+  },
+
+  _updateVenueSuggestion(team) {
+    const venueInput = document.getElementById('match-venue');
+    const suggestion = document.getElementById('venue-suggestion');
+    if (!suggestion) return;
+
+    if (team?.homeground) {
+      suggestion.classList.remove('hidden');
+      suggestion.innerHTML = `&#x1F3DF; <strong>${team.homeground}</strong> &nbsp;
+        <button class="venue-use-btn" onclick="App.useHomeGround('${team.homeground.replace(/'/g,"\\'")}')">Use this ground</button>`;
+    } else {
+      suggestion.classList.add('hidden');
+      suggestion.innerHTML = '';
+    }
+  },
+
+  useHomeGround(ground) {
+    const venueInput = document.getElementById('match-venue');
+    if (venueInput) venueInput.value = ground;
+    const suggestion = document.getElementById('venue-suggestion');
+    if (suggestion) suggestion.classList.add('hidden');
   },
 
   // ── Bulk import ─────────────────────────────────────────
@@ -692,14 +721,15 @@ const App = {
   _processTeamImportRows(rows) {
     if (!rows || rows.length === 0) { this.toast('No data found in file.'); return; }
     const firstRow = rows[0].map(h => String(h || '').toLowerCase().trim());
-    const hasHeader = firstRow.some(h => ['name','team','colour','color'].some(k => h.includes(k)));
-    let colName = 0, colColour = 1;
+    const hasHeader = firstRow.some(h => ['name','team','colour','color','ground','venue'].some(k => h.includes(k)));
+    let colName = 0, colColour = 1, colGround = 2;
     let startIdx = 0;
     if (hasHeader) {
       startIdx = 1;
       firstRow.forEach((h, i) => {
-        if (h.includes('name') || h.includes('team')) colName   = i;
-        if (h.includes('colour') || h.includes('color')) colColour = i;
+        if (h.includes('name') || h.includes('team'))        colName   = i;
+        if (h.includes('colour') || h.includes('color'))     colColour = i;
+        if (h.includes('ground') || h.includes('venue') || h.includes('home')) colGround = i;
       });
     }
     let added = 0, skipped = 0;
@@ -711,10 +741,10 @@ const App = {
       const exists = State.teams.some(t => t.name.toLowerCase() === name.toLowerCase());
       if (exists) { skipped++; continue; }
       let colour = String(row[colColour] || '').trim();
-      // Accept hex colours with or without #
       if (colour && !colour.startsWith('#')) colour = '#' + colour;
       if (!/^#[0-9a-fA-F]{3,6}$/.test(colour)) colour = '#4a9eff';
-      State.addTeam({ name, colour });
+      const homeground = String(row[colGround] || '').trim();
+      State.addTeam({ name, colour, homeground });
       added++;
     }
     this.renderTeams();

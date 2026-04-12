@@ -1723,6 +1723,36 @@ html, body {
 .colour-swatch:active { transform: scale(0.9); }
 .colour-swatch.selected { border-color: white; transform: scale(1.2); }
 
+/* ── Venue suggestion in match setup ── */
+.venue-suggestion {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: rgba(74,158,255,0.08);
+  border: 1px solid rgba(74,158,255,0.25);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.venue-suggestion.hidden { display: none; }
+
+.venue-use-btn {
+  background: var(--accent);
+  border: none;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── Delete team button ── */
 .btn-danger-full {
   width: 100%;

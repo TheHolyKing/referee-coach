@@ -121,6 +121,10 @@
           <input type="text" id="team-name" placeholder="e.g. Brisbane Lions">
         </div>
         <div class="form-group">
+          <label>Home Ground</label>
+          <input type="text" id="team-homeground" placeholder="e.g. Ballymore Stadium">
+        </div>
+        <div class="form-group">
           <label>Team Colour</label>
           <div class="colour-picker-wrap">
             <input type="color" id="team-colour" value="#4a9eff" oninput="App.onColourChange(this.value)">
@@ -245,6 +249,7 @@
         <div class="form-group">
           <label>Venue</label>
           <input type="text" id="match-venue" placeholder="Ground / venue name">
+          <div id="venue-suggestion" class="venue-suggestion hidden"></div>
         </div>
         <div class="form-group">
           <label>Match Duration</label>
