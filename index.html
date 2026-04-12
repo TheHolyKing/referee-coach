@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ref Coach">
+  <title>Referee Coach</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div id="app">
+
+    <!-- ═══════════════════ SCREEN: HOME ═══════════════════ -->
+    <div id="screen-home" class="screen active">
+      <header class="topbar">
+        <h1>Referee Coach</h1>
+        <button class="btn-icon" onclick="document.getElementById('import-file').click()" aria-label="Import referees">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        </button>
+        <button class="btn-icon" onclick="App.nav('new-referee')" aria-label="Add referee">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+      </header>
+      <input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="App.importReferees(this)">
+      <div class="search-bar">
+        <input type="search" id="referee-search" placeholder="Search referees…" oninput="App.filterReferees(this.value)">
+      </div>
+      <div id="referee-list" class="list-container"></div>
+      <div class="fab-container">
+        <button class="fab" onclick="App.nav('new-match-select')">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          New Match
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: NEW REFEREE ═══════════════════ -->
+    <div id="screen-new-referee" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>New Referee</h1>
+        <button class="btn-text" onclick="App.saveReferee()">Save</button>
+      </header>
+      <div class="form-body">
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" id="ref-firstname" placeholder="First name" autocomplete="given-name">
+        </div>
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" id="ref-lastname" placeholder="Last name" autocomplete="family-name">
+        </div>
+        <div class="form-group">
+          <label>Union / Club</label>
+          <input type="text" id="ref-union" placeholder="e.g. Queensland Rugby">
+        </div>
+        <div class="form-group">
+          <label>Email (for reports)</label>
+          <input type="email" id="ref-email" placeholder="referee@example.com" autocomplete="email">
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: REFEREE PROFILE ═══════════════════ -->
+    <div id="screen-referee" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1 id="referee-profile-name">Referee</h1>
+        <button class="btn-icon" onclick="App.editReferee()" aria-label="Edit">
+          <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
+        <button class="btn-icon btn-icon-danger" onclick="App.confirmDeleteReferee()" aria-label="Delete referee">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </header>
+      <div id="referee-profile-details" class="profile-details"></div>
+      <div class="section-header">Match History</div>
+      <div id="referee-match-history" class="list-container"></div>
+      <div class="fab-container">
+        <button class="fab" onclick="App.startMatchForCurrentReferee()">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          New Match
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: NEW MATCH — SELECT REFEREE ═══════════════════ -->
+    <div id="screen-new-match-select" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>Select Referee</h1>
+      </header>
+      <div class="search-bar">
+        <input type="search" id="select-referee-search" placeholder="Search by name…" oninput="App.filterSelectReferee(this.value)" autocomplete="off">
+      </div>
+      <div id="select-referee-list" class="list-container"></div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: MATCH SETUP ═══════════════════ -->
+    <div id="screen-match-setup" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>Match Details</h1>
+        <button class="btn-text" onclick="App.startLiveMatch()">Start</button>
+      </header>
+      <div class="form-body">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="match-date">
+        </div>
+        <div class="form-group">
+          <label>Competition / Grade</label>
+          <input type="text" id="match-competition" placeholder="e.g. Club Championship, Grade 3">
+        </div>
+        <div class="form-group">
+          <label>Home Team</label>
+          <input type="text" id="match-home" placeholder="Home team">
+        </div>
+        <div class="form-group">
+          <label>Away Team</label>
+          <input type="text" id="match-away" placeholder="Away team">
+        </div>
+        <div class="form-group">
+          <label>Venue</label>
+          <input type="text" id="match-venue" placeholder="Ground / venue name">
+        </div>
+        <div class="form-group">
+          <label>Match Duration</label>
+          <select id="match-duration">
+            <option value="40">40 min halves (80 min)</option>
+            <option value="35">35 min halves (70 min)</option>
+            <option value="30">30 min halves (60 min)</option>
+            <option value="25">25 min halves (50 min)</option>
+            <option value="20">20 min halves (40 min)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>AR1 Name</label>
+          <input type="text" id="match-ar1" placeholder="Assistant Referee 1">
+        </div>
+        <div class="form-group">
+          <label>AR2 Name</label>
+          <input type="text" id="match-ar2" placeholder="Assistant Referee 2">
+        </div>
+        <div class="form-group">
+          <label>TMO</label>
+          <input type="text" id="match-tmo" placeholder="TMO name (if applicable)">
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: LIVE MATCH ═══════════════════ -->
+    <div id="screen-live-match" class="screen">
+      <header class="topbar topbar-dark">
+        <button class="btn-back" onclick="App.confirmExitLive()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <div class="match-header-info">
+          <div id="live-teams" class="live-teams">Home vs Away</div>
+          <div class="live-timer-row">
+            <div id="live-timer" class="live-timer">00:00</div>
+            <div id="live-phase-badge" class="live-phase-badge"></div>
+          </div>
+        </div>
+        <button class="btn-text" onclick="App.goToAssessment()">Assess</button>
+      </header>
+
+      <!-- Timer controls -->
+      <div class="timer-controls">
+        <button class="btn-timer" id="btn-timer-toggle" onclick="App.toggleTimer()">Start</button>
+        <button class="btn-timer btn-timer-halftime" id="btn-halftime" onclick="App.pressHalfTime()">Half Time</button>
+        <button class="btn-timer btn-timer-secondary" onclick="App.resetTimer()">Reset</button>
+      </div>
+
+      <!-- Score tracker -->
+      <div class="score-tracker">
+        <div class="score-team">
+          <div id="live-home-name" class="team-name">Home</div>
+          <div class="score-controls">
+            <button class="btn-score-minus" onclick="App.adjustScore('home',-1)">−</button>
+            <div id="live-home-score" class="score-value">0</div>
+            <button class="btn-score-plus" onclick="App.openScorePicker('home')">+</button>
+          </div>
+        </div>
+        <div class="score-divider">–</div>
+        <div class="score-team">
+          <div id="live-away-name" class="team-name">Away</div>
+          <div class="score-controls">
+            <button class="btn-score-minus" onclick="App.adjustScore('away',-1)">−</button>
+            <div id="live-away-score" class="score-value">0</div>
+            <button class="btn-score-plus" onclick="App.openScorePicker('away')">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase buttons -->
+      <div class="section-header">Log Event</div>
+      <div class="phase-buttons">
+        <button class="btn-phase" onclick="App.openPhase('Scrum')">Scrum</button>
+        <button class="btn-phase" onclick="App.openPhase('Lineout')">Lineout</button>
+        <button class="btn-phase" onclick="App.openPhase('Tackle')">Tackle</button>
+        <button class="btn-phase btn-phase-wide" onclick="App.openPhase('Pen Gen Play')">Pen Gen Play</button>
+        <button class="btn-phase" onclick="App.openPhase('Ruck')">Ruck</button>
+        <button class="btn-phase" onclick="App.openPhase('Maul')">Maul</button>
+        <button class="btn-phase btn-phase-critical btn-phase-wide" onclick="App.openPhase('Critical')">Critical</button>
+      </div>
+
+      <!-- Event log -->
+      <div class="event-log-header">
+        <span id="event-log-title">Events (0)</span>
+        <button class="btn-edit-entries" onclick="App.toggleEditEntries()">Edit Entries</button>
+      </div>
+      <div id="event-log-list" class="event-log"></div>
+
+      <!-- Quick notes -->
+      <div class="section-header">Match Notes</div>
+      <div class="quick-notes-area">
+        <textarea id="live-notes" placeholder="Other comments and observations…" rows="3"></textarea>
+      </div>
+      <div style="height: 80px;"></div>
+    </div>
+
+    <!-- ═══════════════════ PHASE MODAL ═══════════════════ -->
+    <div id="phase-modal-overlay" class="phase-modal-overlay hidden">
+      <div class="phase-modal" id="phase-modal">
+        <div class="pm-title" id="pm-title">Ruck</div>
+
+        <!-- Team selector -->
+        <div class="pm-section-label">Possession / Attacking Team</div>
+        <div class="pm-team-row">
+          <button class="pm-team-btn active" id="pm-team-home" onclick="PhaseModal.setTeam('home')">Home</button>
+          <button class="pm-team-btn" id="pm-team-away" onclick="PhaseModal.setTeam('away')">Away</button>
+        </div>
+
+        <!-- Position on field -->
+        <div class="pm-section-label">Position on Field</div>
+        <div class="pm-position-box">
+          <div class="pm-position-label">Position on Field</div>
+          <div class="pm-position-row">
+            <button class="pm-pos-btn" data-pos="22-home" onclick="PhaseModal.setPos(this)">22</button>
+            <button class="pm-pos-btn" data-pos="half-home" onclick="PhaseModal.setPos(this)">Half</button>
+            <button class="pm-pos-btn" data-pos="half-away" onclick="PhaseModal.setPos(this)">Half</button>
+            <button class="pm-pos-btn" data-pos="22-away" onclick="PhaseModal.setPos(this)">22</button>
+          </div>
+          <div class="pm-position-sublabels">
+            <span>Home 22</span><span>Home Half</span><span>Away Half</span><span>Away 22</span>
+          </div>
+        </div>
+
+        <!-- Critical free text (shown for Critical phase only) -->
+        <div id="pm-critical-section" class="hidden">
+          <div class="pm-section-label">Comment / Observation</div>
+          <div style="padding: 0 16px;">
+            <textarea id="pm-critical-text" class="pm-critical-textarea" rows="5" placeholder="Note a critical incident, key decision, or important observation…"></textarea>
+          </div>
+        </div>
+
+        <!-- Outcomes (hidden for Critical) -->
+        <div id="pm-structured-section">
+          <div class="pm-section-label" id="pm-outcome-label">Outcome</div>
+          <div class="pm-button-grid" id="pm-outcomes"></div>
+
+          <!-- Infringements -->
+          <div class="pm-section-label" id="pm-infringement-label">Infringement</div>
+          <div class="pm-button-grid" id="pm-infringements"></div>
+        </div>
+
+        <!-- Card issued (hidden for Critical) -->
+        <div id="pm-card-section">
+          <div class="pm-section-label">Card Issued (optional)</div>
+          <div class="pm-card-row">
+            <button class="pm-card-btn pm-card-yellow" id="pm-card-yellow" onclick="PhaseModal.setCard('yellow')">🟡 Yellow Card</button>
+            <button class="pm-card-btn pm-card-red"    id="pm-card-red"    onclick="PhaseModal.setCard('red')">🔴 Red Card</button>
+          </div>
+
+          <!-- Against -->
+          <div class="pm-against-row">
+            <button class="pm-against-btn" id="pm-against-home" onclick="PhaseModal.setAgainst('home')">Against Home</button>
+            <button class="pm-against-btn" id="pm-against-away" onclick="PhaseModal.setAgainst('away')">Against Away</button>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="pm-footer">
+          <button class="pm-btn-reset" onclick="PhaseModal.reset()">Reset</button>
+          <button class="pm-btn-cancel" onclick="PhaseModal.cancel()">Cancel</button>
+          <button class="pm-btn-done" id="pm-done" onclick="PhaseModal.done()">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: ASSESSMENT ═══════════════════ -->
+    <div id="screen-assessment" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>Assessment</h1>
+        <button class="btn-text" onclick="App.saveAssessment()">Save</button>
+      </header>
+
+      <div class="form-body">
+        <div class="assessment-match-summary" id="assessment-match-summary"></div>
+
+        <!-- Final score -->
+        <div class="section-header">Final Score</div>
+        <div class="final-score-row">
+          <div class="form-group flex-1">
+            <label id="final-home-label">Home</label>
+            <input type="number" id="final-home-score" min="0" value="0">
+          </div>
+          <div class="score-sep">–</div>
+          <div class="form-group flex-1">
+            <label id="final-away-label">Away</label>
+            <input type="number" id="final-away-score" min="0" value="0">
+          </div>
+        </div>
+
+        <!-- Overall Rating -->
+        <div class="section-header">Overall Performance</div>
+        <div class="rating-group" id="rating-overall">
+          <div class="rating-label">Overall Rating</div>
+          <div class="rating-buttons">
+            <button class="btn-rating" data-area="overall" data-val="Excellent" onclick="App.setRating(this)">Excellent</button>
+            <button class="btn-rating" data-area="overall" data-val="Good" onclick="App.setRating(this)">Good</button>
+            <button class="btn-rating" data-area="overall" data-val="OK" onclick="App.setRating(this)">OK</button>
+            <button class="btn-rating" data-area="overall" data-val="Poor" onclick="App.setRating(this)">Poor</button>
+          </div>
+        </div>
+
+        <!-- Assessment areas -->
+        <div class="section-header">Performance Areas</div>
+
+        <div id="assessment-areas">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Cards & Discipline -->
+        <div class="section-header">Cards & Discipline</div>
+        <div class="cards-row">
+          <div class="card-counter">
+            <label>Yellow Cards</label>
+            <div class="counter-controls">
+              <button onclick="App.adjCard('yellow',-1)">−</button>
+              <span id="count-yellow">0</span>
+              <button onclick="App.adjCard('yellow',1)">+</button>
+            </div>
+          </div>
+          <div class="card-counter">
+            <label>Red Cards</label>
+            <div class="counter-controls">
+              <button onclick="App.adjCard('red',-1)">−</button>
+              <span id="count-red">0</span>
+              <button onclick="App.adjCard('red',1)">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary notes -->
+        <div class="section-header">Match Notes</div>
+        <div class="form-group">
+          <label>Key Observations</label>
+          <textarea id="assess-observations" placeholder="What stood out during this match?" rows="4"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Strengths</label>
+          <textarea id="assess-strengths" placeholder="What did the referee do well?" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Areas for Development</label>
+          <textarea id="assess-development" placeholder="What should the referee focus on improving?" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Action Points for Next Match</label>
+          <textarea id="assess-actions" placeholder="Specific things to work on…" rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Referee's Self-Assessment Notes</label>
+          <textarea id="assess-self" placeholder="Referee's own comments (fill in after debrief)…" rows="3"></textarea>
+        </div>
+
+        <div style="height: 40px;"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: MATCH REPORT ═══════════════════ -->
+    <div id="screen-report" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>Match Report</h1>
+        <button class="btn-icon" onclick="App.shareReport()" aria-label="Share">
+          <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
+        </button>
+      </header>
+      <div class="report-actions">
+        <button class="btn-action" onclick="App.printReport()">
+          <svg viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+          Print / PDF
+        </button>
+        <button class="btn-action" onclick="App.emailReport()">
+          <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          Email Referee
+        </button>
+        <button class="btn-action btn-danger" onclick="App.confirmDeleteMatch()">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          Delete Match
+        </button>
+      </div>
+      <div id="report-content" class="report-body"></div>
+      <div style="height: 40px;"></div>
+    </div>
+
+    <!-- ═══════════════════ MODAL: SCORE PICKER ═══════════════════ -->
+    <div id="score-picker-overlay" class="score-picker-overlay hidden">
+      <div class="score-picker">
+        <div class="score-picker-title" id="score-picker-title">Home Scored</div>
+        <div class="score-picker-sub">Choose the points.</div>
+        <button class="score-picker-cancel" onclick="App.closeScorePicker()">Cancel</button>
+        <button class="score-picker-opt" onclick="App.applyScore(5)">Try <span>5 pts</span></button>
+        <button class="score-picker-opt" onclick="App.applyScore(2)">Conversion <span>2 pts</span></button>
+        <button class="score-picker-opt" onclick="App.applyScore(7)">Try &amp; Conversion <span>7 pts</span></button>
+        <button class="score-picker-opt" onclick="App.applyScore(3, 'penalty')">Penalty <span>3 pts</span></button>
+        <button class="score-picker-opt" onclick="App.applyScore(3, 'dropgoal')">Drop Goal <span>3 pts</span></button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL: CONFIRM ═══════════════════ -->
+    <div id="modal-overlay" class="modal-overlay hidden" onclick="App.closeModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div id="modal-title" class="modal-title"></div>
+        <div id="modal-message" class="modal-message"></div>
+        <div class="modal-actions">
+          <button id="modal-cancel" class="btn-modal btn-modal-cancel" onclick="App.closeModal()">Cancel</button>
+          <button id="modal-confirm" class="btn-modal btn-modal-confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ TOAST ═══════════════════ -->
+    <div id="toast" class="toast hidden"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+═══════════════════════════════════════════════
+  REFEREE COACH — SETUP GUIDE
+═══════════════════════════════════════════════
+
+OPTION 1: GitHub Pages (FREE, recommended for iOS)
+───────────────────────────────────────────────────
+1. Go to github.com and create a free account if you don't have one.
+2. Create a new repository called "referee-coach".
+3. Upload all files in this folder to the repository.
+4. Go to Settings → Pages → Source: Deploy from a branch → main → / (root).
+5. GitHub will give you a URL like: https://yourusername.github.io/referee-coach
+6. On your iPhone, open that URL in Safari.
+7. Tap the Share button → "Add to Home Screen" → "Add".
+8. The app will appear on your home screen and work offline.
+
+OPTION 2: Netlify Drop (easiest, FREE)
+───────────────────────────────────────────────────
+1. Go to netlify.com/drop in your browser.
+2. Drag the entire "referee-coach-pwa" folder onto the page.
+3. Netlify gives you a URL instantly (e.g. https://random-name.netlify.app).
+4. Open that URL in Safari on your iPhone.
+5. Tap Share → "Add to Home Screen".
+
+OPTION 3: Local testing on PC
+───────────────────────────────────────────────────
+1. Right-click "serve.ps1" → "Run with PowerShell".
+2. Open http://localhost:8080 in your browser.
+   (Note: PWA features like offline mode require HTTPS, so use Options 1 or 2 for full iOS install.)
+
+GENERATING APP ICONS
+───────────────────────────────────────────────────
+1. Open "generate-icons.html" in a web browser.
+2. Right-click the first canvas image → Save Image As → icons/icon-192.png
+3. Right-click the second canvas image → Save Image As → icons/icon-512.png
+   (Create the "icons" folder first if it doesn't exist.)
+
+═══════════════════════════════════════════════
+  APP FEATURES
+═══════════════════════════════════════════════
+
+✓ Referee profiles (name, grade, union, email)
+✓ Match setup (teams, date, competition, venue, officials)
+✓ Live match screen:
+    - Match timer with half controls
+    - Score tracker (tap +/- to adjust)
+    - One-tap penalty logging with reason
+    - Custom penalty reasons
+    - Quick notes field
+✓ Post-match assessment:
+    - 8 performance areas rated Excellent/Good/OK/Poor
+    - Notes per area
+    - Card counter (yellow/red)
+    - Strengths, development areas, action points
+    - Referee self-assessment field
+✓ Match report:
+    - Full formatted report view
+    - Print to PDF (use browser print)
+    - Email report to referee (opens mail app)
+    - Share sheet (iOS native share)
+✓ Referee history & match list
+✓ Works fully offline once installed
+✓ All data stored locally on device (no server, private)
