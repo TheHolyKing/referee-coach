@@ -1016,9 +1016,12 @@ const App = {
 
       // Score event
       if (e.isScore) {
-        return `<div class="event-marker marker-score">
+        const scoreColour = e.possession === 'home'
+          ? (match?.homeColour || 'var(--accent)')
+          : (match?.awayColour || 'var(--accent2)');
+        return `<div class="event-marker marker-score" style="border-left:4px solid ${scoreColour};">
           <span class="event-marker-time">${e.time}</span>
-          <span class="event-marker-label">&#9679; ${e.notes}</span>
+          <span class="event-marker-label" style="color:${scoreColour};">&#9679; ${e.notes}</span>
           <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
         </div>`;
       }
@@ -1068,7 +1071,28 @@ const App = {
       App.logEvent({ phase: label, isMarker: true });
     }
   },
-  resetTimer()     { Timer.reset(); },
+  resetTimer() {
+    this.showModal(
+      'Reset Match?',
+      'This will reset the timer, score and clear all logged events. This cannot be undone.',
+      'Reset',
+      'btn-modal-danger',
+      () => {
+        const match = State.getMatch(this.currentMatchId);
+        if (match) {
+          match.liveData.homeScore = 0;
+          match.liveData.awayScore = 0;
+          match.liveData.events    = [];
+          match.liveData.notes     = '';
+          State.saveMatches();
+        }
+        Timer.reset();
+        document.getElementById('live-notes').value = '';
+        this.renderScores();
+        this.renderEventLog();
+      }
+    );
+  },
 
   confirmExitLive() {
     this.saveLiveNotes();
@@ -1375,9 +1399,10 @@ const App = {
         </tr>`;
       }
       if (e.isScore) {
-        return `<tr style="background:#e8f4ff;">
+        const sc = e.possession === 'home' ? (match.homeColour || '#1a3a6a') : (match.awayColour || '#1a3a6a');
+        return `<tr style="background:#f0f7ff;border-left:3px solid ${sc};">
           <td style="white-space:nowrap;">${e.time}</td>
-          <td colspan="7" style="font-weight:bold;color:#1a3a6a;">&#9679; ${e.notes}</td>
+          <td colspan="7" style="font-weight:bold;color:${sc};">&#9679; ${e.notes}</td>
         </tr>`;
       }
       const card = e.card === 'yellow' ? 'YC' : e.card === 'red' ? 'RC' : '';
