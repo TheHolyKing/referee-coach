@@ -72,7 +72,31 @@ const State = {
     return this.matches
       .filter(m => m.refereeId === id)
       .sort((a, b) => (b.date || 0) - (a.date || 0));
-  }
+  },
+
+  // ── Teams ──────────────────────────────────────────────
+  teams: DB.load('teams', []),
+  saveTeams() { DB.save('teams', this.teams); },
+
+  addTeam(team) {
+    team.id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    team.createdAt = Date.now();
+    this.teams.push(team);
+    this.saveTeams();
+    return team;
+  },
+
+  updateTeam(id, updates) {
+    const i = this.teams.findIndex(t => t.id === id);
+    if (i >= 0) { Object.assign(this.teams[i], updates); this.saveTeams(); }
+  },
+
+  deleteTeam(id) {
+    this.teams = this.teams.filter(t => t.id !== id);
+    this.saveTeams();
+  },
+
+  getTeam(id) { return this.teams.find(t => t.id === id); }
 };
 
 // ══════════════════════════════════════════════════════════
@@ -294,11 +318,18 @@ const Timer = {
 //  MAIN APP
 // ══════════════════════════════════════════════════════════
 
+const PRESET_COLOURS = [
+  '#c00000','#dc143c','#ff6347','#ff8c00','#ffd700','#228b22','#006400','#2e8b57',
+  '#00bfff','#4169e1','#002366','#800080','#4b0082','#8b0000','#000000','#ffffff',
+  '#b8860b','#1a3a6a','#006d77','#e29578',
+];
+
 const App = {
   currentRefereeId: null,
   currentMatchId:   null,
-  currentMatch:     null,  // live working copy
+  currentMatch:     null,
   editingRefereeId: null,
+  editingTeamId:    null,
 
   // ── Navigation helpers ──────────────────────────────────
   nav(screen) {
@@ -309,15 +340,18 @@ const App = {
   back() {
     const leaving = Router.current();
     Router.pop();
-    // Cleanup leaving screen
-    if (leaving === 'live-match')   Timer.pause();
-    if (leaving === 'new-referee')  this.editingRefereeId = null;
+    if (leaving === 'live-match')  Timer.pause();
+    if (leaving === 'new-referee') this.editingRefereeId = null;
+    if (leaving === 'new-team')    this.editingTeamId = null;
     this.onScreenEnter(Router.current());
   },
 
   onScreenEnter(screen) {
     switch(screen) {
       case 'home':            this.renderHome(); break;
+      case 'referees':        this.renderRefereeList(); break;
+      case 'teams':           this.renderTeams(); break;
+      case 'new-team':        this.prefillTeamForm(); break;
       case 'new-match-select':
         const si = document.getElementById('select-referee-search');
         if (si) si.value = '';
@@ -356,8 +390,21 @@ const App = {
   // ══════════════════════════════════════════════════════
   //  HOME SCREEN
   // ══════════════════════════════════════════════════════
-  renderHome(filter = '') {
+  renderHome() {
+    const rc = State.referees.length;
+    const tc = State.teams.length;
+    const refEl  = document.getElementById('home-ref-count');
+    const teamEl = document.getElementById('home-team-count');
+    if (refEl)  refEl.textContent  = rc + ' referee' + (rc !== 1 ? 's' : '');
+    if (teamEl) teamEl.textContent = tc + ' team' + (tc !== 1 ? 's' : '');
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  REFEREES SCREEN
+  // ══════════════════════════════════════════════════════
+  renderRefereeList(filter = '') {
     const list = document.getElementById('referee-list');
+    if (!list) return;
     const refs = State.referees
       .filter(r => !filter || (r.firstName + ' ' + r.lastName).toLowerCase().includes(filter.toLowerCase()))
       .sort((a, b) => (a.lastName || '').localeCompare(b.lastName || ''));
@@ -372,20 +419,153 @@ const App = {
 
     list.innerHTML = refs.map(r => {
       const matches = State.matchesForReferee(r.id);
-      const last = matches[0];
       const initials = ((r.firstName||'?')[0] + (r.lastName||'?')[0]).toUpperCase();
       return `<div class="list-item" onclick="App.openReferee('${r.id}')">
         <div class="list-avatar">${initials}</div>
         <div class="list-item-body">
           <div class="list-item-title">${r.firstName} ${r.lastName}</div>
-          <div class="list-item-sub">${r.grade || ''}${r.grade && r.union ? ' · ' : ''}${r.union || ''} · ${matches.length} match${matches.length !== 1 ? 'es' : ''}</div>
+          <div class="list-item-sub">${r.union || ''} · ${matches.length} match${matches.length !== 1 ? 'es' : ''}</div>
         </div>
         <div class="list-chevron">›</div>
       </div>`;
     }).join('');
   },
 
-  filterReferees(val) { this.renderHome(val); },
+  filterReferees(val) { this.renderRefereeList(val); },
+
+  // ══════════════════════════════════════════════════════
+  //  TEAMS SCREEN
+  // ══════════════════════════════════════════════════════
+  renderTeams() {
+    const list = document.getElementById('team-list');
+    if (!list) return;
+    const teams = [...State.teams].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (teams.length === 0) {
+      list.innerHTML = `<div class="empty-state">
+        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+        <p>No teams yet.\nTap + to add your first team.</p>
+      </div>`;
+      return;
+    }
+    list.innerHTML = teams.map(t => `
+      <div class="list-item" onclick="App.openTeam('${t.id}')">
+        <div class="team-list-dot" style="background:${t.colour || '#888'};border-color:${t.colour || '#888'}"></div>
+        <div class="list-item-body">
+          <div class="list-item-title">${t.name}</div>
+          <div class="list-item-sub" style="color:${t.colour || 'var(--text2)'}">&#9632; ${t.colour || 'No colour'}</div>
+        </div>
+        <div class="list-chevron">›</div>
+      </div>`).join('');
+  },
+
+  openTeam(id) {
+    this.editingTeamId = id;
+    this.nav('new-team');
+  },
+
+  prefillTeamForm() {
+    const nameEl   = document.getElementById('team-name');
+    const colourEl = document.getElementById('team-colour');
+    const titleEl  = document.querySelector('#screen-new-team .topbar h1');
+    const delBtn   = document.getElementById('team-delete-btn');
+
+    if (this.editingTeamId) {
+      const t = State.getTeam(this.editingTeamId);
+      if (!t) return;
+      if (nameEl)   nameEl.value   = t.name   || '';
+      if (colourEl) colourEl.value = t.colour || '#4a9eff';
+      if (titleEl)  titleEl.textContent = 'Edit Team';
+      if (delBtn)   delBtn.classList.remove('hidden');
+    } else {
+      if (nameEl)   nameEl.value   = '';
+      if (colourEl) colourEl.value = '#4a9eff';
+      if (titleEl)  titleEl.textContent = 'New Team';
+      if (delBtn)   delBtn.classList.add('hidden');
+    }
+    this._renderColourPresets(colourEl ? colourEl.value : '#4a9eff');
+    this._syncColourPreview(colourEl ? colourEl.value : '#4a9eff');
+  },
+
+  _renderColourPresets(selected) {
+    const wrap = document.getElementById('colour-presets');
+    if (!wrap) return;
+    wrap.innerHTML = PRESET_COLOURS.map(c => {
+      const active = c.toLowerCase() === (selected || '').toLowerCase() ? ' selected' : '';
+      const border = c === '#ffffff' ? 'border:2px solid #666;' : '';
+      return `<div class="colour-swatch${active}" style="background:${c};${border}" onclick="App.selectPresetColour('${c}')"></div>`;
+    }).join('');
+  },
+
+  _syncColourPreview(hex) {
+    const prev = document.getElementById('colour-preview');
+    const label = document.getElementById('colour-hex');
+    if (prev)  prev.style.background = hex;
+    if (label) label.textContent = hex;
+    this._renderColourPresets(hex);
+  },
+
+  onColourChange(hex) {
+    this._syncColourPreview(hex);
+  },
+
+  selectPresetColour(hex) {
+    const el = document.getElementById('team-colour');
+    if (el) el.value = hex;
+    this._syncColourPreview(hex);
+  },
+
+  saveTeam() {
+    const name   = (document.getElementById('team-name')?.value || '').trim();
+    const colour = document.getElementById('team-colour')?.value || '#4a9eff';
+    if (!name) { this.toast('Please enter a team name'); return; }
+
+    if (this.editingTeamId) {
+      State.updateTeam(this.editingTeamId, { name, colour });
+      this.toast('Team updated');
+    } else {
+      State.addTeam({ name, colour });
+      this.toast('Team added');
+    }
+    this.editingTeamId = null;
+    Router.pop();
+    this.renderTeams();
+    this.renderHome();
+  },
+
+  confirmDeleteTeam() {
+    const t = State.getTeam(this.editingTeamId);
+    if (!t) return;
+    this.showModal(
+      'Delete Team?',
+      `"${t.name}" will be removed. Matches already recorded won't be affected.`,
+      'Delete', 'btn-modal-danger',
+      () => {
+        State.deleteTeam(this.editingTeamId);
+        this.editingTeamId = null;
+        this.toast('Team deleted');
+        Router.pop();
+        this.renderTeams();
+        this.renderHome();
+      }
+    );
+  },
+
+  // ── Team picker in match setup ──────────────────────────
+  onTeamPickerChange(side) {
+    const sel   = document.getElementById('match-' + side + '-select');
+    const dot   = document.getElementById('match-' + side + '-dot');
+    const input = document.getElementById('match-' + side);
+    if (!sel) return;
+    if (sel.value) {
+      const team = State.getTeam(sel.value);
+      if (team) {
+        if (input) input.value = team.name;
+        if (dot)  { dot.style.background = team.colour; dot.style.borderColor = team.colour; }
+      }
+    } else {
+      if (dot) { dot.style.background = 'transparent'; dot.style.borderColor = 'var(--border)'; }
+    }
+  },
 
   // ── Bulk import ─────────────────────────────────────────
   importReferees(input) {
@@ -509,7 +689,7 @@ const App = {
       const ref = State.addReferee(data);
       this.toast('Referee added');
       Router.pop();
-      this.renderHome();
+      this.renderRefereeList();
       this.openReferee(ref.id);
     }
   },
@@ -641,6 +821,18 @@ const App = {
     document.getElementById('match-ar2').value = '';
     document.getElementById('match-tmo').value = '';
     document.getElementById('match-duration').value = '40';
+
+    // Populate team dropdowns
+    const teams = [...State.teams].sort((a, b) => (a.name||'').localeCompare(b.name||''));
+    ['home', 'away'].forEach(side => {
+      const sel = document.getElementById('match-' + side + '-select');
+      const dot = document.getElementById('match-' + side + '-dot');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Select a saved team…</option>' +
+        teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+      sel.value = '';
+      if (dot) { dot.style.background = 'transparent'; dot.style.borderColor = 'var(--border)'; }
+    });
   },
 
   startLiveMatch() {
@@ -651,12 +843,18 @@ const App = {
 
     const halfMins = parseInt(document.getElementById('match-duration').value, 10);
 
+    // Read team colours from select
+    const homeTeam = State.getTeam(document.getElementById('match-home-select')?.value);
+    const awayTeam = State.getTeam(document.getElementById('match-away-select')?.value);
+
     const matchData = {
       refereeId:   this.currentRefereeId,
       date:        date ? new Date(date).getTime() : Date.now(),
       competition: document.getElementById('match-competition').value.trim(),
       homeTeam:    home,
       awayTeam:    away,
+      homeColour:  homeTeam?.colour || null,
+      awayColour:  awayTeam?.colour || null,
       venue:       document.getElementById('match-venue').value.trim(),
       halfMins,
       ar1:         document.getElementById('match-ar1').value.trim(),
@@ -691,6 +889,11 @@ const App = {
     document.getElementById('live-teams').textContent = m.homeTeam + ' v ' + m.awayTeam;
     document.getElementById('live-home-name').textContent = m.homeTeam;
     document.getElementById('live-away-name').textContent = m.awayTeam;
+    // Apply team colours
+    const homeEl = document.getElementById('live-home-name');
+    const awayEl = document.getElementById('live-away-name');
+    if (homeEl) homeEl.style.borderLeftColor = m.homeColour || 'var(--accent)';
+    if (awayEl) awayEl.style.borderLeftColor = m.awayColour || 'var(--accent2)';
     this.renderScores();
     this.renderEventLog();
     document.getElementById('live-notes').value = m.liveData?.notes || '';
@@ -1532,18 +1735,28 @@ const PhaseModal = {
     const cfg = PHASES[phase];
     document.getElementById('pm-title').textContent = phase;
 
-    // Team buttons - update labels
+    // Team buttons - update labels and colours
     const match = State.getMatch(App.currentMatchId);
+    const homeBtn    = document.getElementById('pm-team-home');
+    const awayBtn    = document.getElementById('pm-team-away');
+    const againstH   = document.getElementById('pm-against-home');
+    const againstA   = document.getElementById('pm-against-away');
     if (match) {
-      document.getElementById('pm-team-home').textContent = match.homeTeam;
-      document.getElementById('pm-team-away').textContent = match.awayTeam;
-      document.getElementById('pm-against-home').textContent = `Against ${match.homeTeam}`;
-      document.getElementById('pm-against-away').textContent = `Against ${match.awayTeam}`;
+      homeBtn.textContent  = match.homeTeam;
+      awayBtn.textContent  = match.awayTeam;
+      againstH.textContent = `Against ${match.homeTeam}`;
+      againstA.textContent = `Against ${match.awayTeam}`;
+      if (match.homeColour) homeBtn.style.setProperty('--team-btn-colour', match.homeColour);
+      else homeBtn.style.removeProperty('--team-btn-colour');
+      if (match.awayColour) awayBtn.style.setProperty('--team-btn-colour', match.awayColour);
+      else awayBtn.style.removeProperty('--team-btn-colour');
     } else {
-      document.getElementById('pm-team-home').textContent = 'Home';
-      document.getElementById('pm-team-away').textContent = 'Away';
-      document.getElementById('pm-against-home').textContent = 'Against Home';
-      document.getElementById('pm-against-away').textContent = 'Against Away';
+      homeBtn.textContent  = 'Home';
+      awayBtn.textContent  = 'Away';
+      againstH.textContent = 'Against Home';
+      againstA.textContent = 'Against Away';
+      homeBtn.style.removeProperty('--team-btn-colour');
+      awayBtn.style.removeProperty('--team-btn-colour');
     }
 
     // Set default team selection

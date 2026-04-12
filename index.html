@@ -19,6 +19,50 @@
     <div id="screen-home" class="screen active">
       <header class="topbar">
         <h1>Referee Coach</h1>
+      </header>
+      <div class="home-scroll">
+        <div class="home-cards">
+          <button class="home-card home-card-primary" onclick="App.nav('new-match-select')">
+            <div class="home-card-icon">
+              <svg viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+            </div>
+            <div class="home-card-content">
+              <div class="home-card-title">New Match</div>
+              <div class="home-card-sub">Start coaching a match now</div>
+            </div>
+            <div class="home-card-arrow">›</div>
+          </button>
+          <button class="home-card" onclick="App.nav('referees')">
+            <div class="home-card-icon">
+              <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </div>
+            <div class="home-card-content">
+              <div class="home-card-title">Referees</div>
+              <div class="home-card-sub" id="home-ref-count">0 referees</div>
+            </div>
+            <div class="home-card-arrow">›</div>
+          </button>
+          <button class="home-card" onclick="App.nav('teams')">
+            <div class="home-card-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+            </div>
+            <div class="home-card-content">
+              <div class="home-card-title">Teams</div>
+              <div class="home-card-sub" id="home-team-count">0 teams</div>
+            </div>
+            <div class="home-card-arrow">›</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: REFEREES ═══════════════════ -->
+    <div id="screen-referees" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>Referees</h1>
         <button class="btn-icon" onclick="document.getElementById('import-file').click()" aria-label="Import referees">
           <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
         </button>
@@ -31,11 +75,49 @@
         <input type="search" id="referee-search" placeholder="Search referees…" oninput="App.filterReferees(this.value)">
       </div>
       <div id="referee-list" class="list-container"></div>
-      <div class="fab-container">
-        <button class="fab" onclick="App.nav('new-match-select')">
-          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          New Match
+    </div>
+
+    <!-- ═══════════════════ SCREEN: TEAMS ═══════════════════ -->
+    <div id="screen-teams" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         </button>
+        <h1>Teams</h1>
+        <button class="btn-icon" onclick="App.nav('new-team')" aria-label="Add team">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+      </header>
+      <div id="team-list" class="list-container"></div>
+    </div>
+
+    <!-- ═══════════════════ SCREEN: NEW TEAM ═══════════════════ -->
+    <div id="screen-new-team" class="screen">
+      <header class="topbar">
+        <button class="btn-back" onclick="App.back()">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1>New Team</h1>
+        <button class="btn-text" onclick="App.saveTeam()">Save</button>
+      </header>
+      <div class="form-body">
+        <div class="form-group">
+          <label>Team Name</label>
+          <input type="text" id="team-name" placeholder="e.g. Brisbane Lions">
+        </div>
+        <div class="form-group">
+          <label>Team Colour</label>
+          <div class="colour-picker-wrap">
+            <input type="color" id="team-colour" value="#4a9eff" oninput="App.onColourChange(this.value)">
+            <div class="colour-preview" id="colour-preview" style="background:#4a9eff"></div>
+            <span id="colour-hex" style="color:var(--text2);font-size:13px;">#4a9eff</span>
+          </div>
+          <div class="colour-presets" id="colour-presets"></div>
+        </div>
+        <div style="padding: 16px 16px 0;">
+          <button id="team-delete-btn" class="btn-danger-full hidden" onclick="App.confirmDeleteTeam()">Delete Team</button>
+        </div>
+        <div style="height:40px"></div>
       </div>
     </div>
 
@@ -127,11 +209,23 @@
         </div>
         <div class="form-group">
           <label>Home Team</label>
-          <input type="text" id="match-home" placeholder="Home team">
+          <div class="team-picker-wrap">
+            <span class="team-dot" id="match-home-dot"></span>
+            <select id="match-home-select" onchange="App.onTeamPickerChange('home')">
+              <option value="">Select a saved team…</option>
+            </select>
+          </div>
+          <input type="text" id="match-home" placeholder="Or type team name" autocomplete="off" style="margin-top:8px;">
         </div>
         <div class="form-group">
           <label>Away Team</label>
-          <input type="text" id="match-away" placeholder="Away team">
+          <div class="team-picker-wrap">
+            <span class="team-dot" id="match-away-dot"></span>
+            <select id="match-away-select" onchange="App.onTeamPickerChange('away')">
+              <option value="">Select a saved team…</option>
+            </select>
+          </div>
+          <input type="text" id="match-away" placeholder="Or type team name" autocomplete="off" style="margin-top:8px;">
         </div>
         <div class="form-group">
           <label>Venue</label>

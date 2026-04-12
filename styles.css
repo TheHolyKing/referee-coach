@@ -1482,6 +1482,208 @@ html, body {
 
 .score-picker-opt:active { background: var(--border); }
 
+/* ── Home Cards ── */
+.home-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 16px 40px;
+}
+
+.home-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+  width: 100%;
+}
+
+.home-card:active { background: var(--surface2); }
+
+.home-card-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.home-card-primary:active { background: #3a8eef; }
+
+.home-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-card-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: var(--accent);
+}
+
+.home-card-primary .home-card-icon svg { fill: white; }
+
+.home-card-content { flex: 1; }
+
+.home-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.home-card-primary .home-card-title { color: white; }
+
+.home-card-sub {
+  font-size: 13px;
+  color: var(--text2);
+  margin-top: 3px;
+}
+
+.home-card-primary .home-card-sub { color: rgba(255,255,255,0.8); }
+
+.home-card-arrow {
+  font-size: 24px;
+  color: var(--text2);
+  font-weight: 300;
+}
+
+.home-card-primary .home-card-arrow { color: rgba(255,255,255,0.7); }
+
+/* ── Team list item dot ── */
+.team-list-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 3px solid transparent;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
+}
+
+/* ── Team picker in match setup ── */
+.team-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 12px 4px 10px;
+}
+
+.team-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.team-picker-wrap select {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 15px;
+  padding: 10px 0;
+  outline: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.team-picker-wrap select option { background: var(--surface); }
+
+/* ── Colour picker in new team form ── */
+.colour-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0;
+}
+
+#team-colour {
+  width: 52px;
+  height: 52px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  padding: 2px;
+  background: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.colour-preview {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.colour-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+
+.colour-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: transform 0.12s, border-color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.colour-swatch:active { transform: scale(0.9); }
+.colour-swatch.selected { border-color: white; transform: scale(1.2); }
+
+/* ── Delete team button ── */
+.btn-danger-full {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255,71,87,0.12);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Team colours in live match ── */
+.team-name {
+  border-left: 4px solid transparent;
+  padding-left: 8px;
+  transition: border-color 0.3s;
+}
+
+/* ── Team colour in phase modal team buttons ── */
+.pm-team-btn {
+  border-left: 4px solid var(--team-btn-colour, var(--border)) !important;
+}
+
 /* ── Print styles ── */
 /* Printing is handled by a standalone popup window (App.printReport).
    If browser print is triggered directly, hide everything. */
