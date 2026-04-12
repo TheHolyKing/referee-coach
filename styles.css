@@ -1300,6 +1300,35 @@ html, body {
 
 .toast.hidden { display: none; }
 
+/* ── Update Banner ── */
+.update-banner {
+  position: fixed;
+  top: calc(var(--safe-top) + 0px);
+  left: 0; right: 0;
+  z-index: 9999;
+  background: var(--accent2);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 12px;
+}
+.update-banner button {
+  background: rgba(0,0,0,0.2);
+  border: none;
+  color: #000;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.update-banner.hidden { display: none; }
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }

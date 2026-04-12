@@ -1450,6 +1450,14 @@ ${events.length > 0 ? `<div class="page-break"></div>
     window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
   },
 
+  applyUpdate() {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg && reg.waiting) {
+        reg.waiting.postMessage('SKIP_WAITING');
+      }
+    });
+  },
+
   shareReport() {
     if (navigator.share) {
       const match = State.getMatch(this.currentMatchId);
@@ -1734,6 +1742,25 @@ document.addEventListener('DOMContentLoaded', () => {
   if (liveNotes) liveNotes.addEventListener('input', () => App.saveLiveNotes());
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // If a new SW is already waiting on first load, show banner immediately
+      if (reg.waiting) {
+        document.getElementById('update-banner').classList.remove('hidden');
+      }
+      // If a new SW installs while the app is open
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            document.getElementById('update-banner').classList.remove('hidden');
+          }
+        });
+      });
+    }).catch(() => {});
+
+    // After SKIP_WAITING, the new SW activates — reload to use it
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
   }
 });
