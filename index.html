@@ -13,6 +13,17 @@
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
+  <!-- ═══════════════════ SPLASH SCREEN ═══════════════════ -->
+  <div id="splash">
+    <div class="splash-inner">
+      <div class="splash-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      </div>
+      <div class="splash-title">Ref Coach</div>
+      <div class="splash-sub">Rugby Union Referee Coaching</div>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- ═══════════════════ SCREEN: HOME ═══════════════════ -->
@@ -84,10 +95,14 @@
           <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         </button>
         <h1>Teams</h1>
+        <button class="btn-icon" onclick="document.getElementById('import-teams-file').click()" aria-label="Import teams">
+          <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+        </button>
         <button class="btn-icon" onclick="App.nav('new-team')" aria-label="Add team">
           <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         </button>
       </header>
+      <input type="file" id="import-teams-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="App.importTeams(this)">
       <div id="team-list" class="list-container"></div>
     </div>
 

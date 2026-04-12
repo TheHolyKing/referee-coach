@@ -658,9 +658,70 @@ const App = {
     }
 
     this.renderHome();
+    this.renderRefereeList();
     const msg = skipped > 0
       ? `${added} imported, ${skipped} skipped (duplicates or missing name)`
       : `${added} referee${added !== 1 ? 's' : ''} imported`;
+    this.toast(msg, 3000);
+  },
+
+  // ── Team bulk import ────────────────────────────────────
+  importTeams(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (e) => this._processTeamImportRows(this._parseCSV(e.target.result));
+      reader.readAsText(file);
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      if (typeof XLSX === 'undefined') { this.toast('XLSX requires an internet connection on first load.', 3000); return; }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+        this._processTeamImportRows(rows);
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      this.toast('Please select a .csv or .xlsx file.');
+    }
+  },
+
+  _processTeamImportRows(rows) {
+    if (!rows || rows.length === 0) { this.toast('No data found in file.'); return; }
+    const firstRow = rows[0].map(h => String(h || '').toLowerCase().trim());
+    const hasHeader = firstRow.some(h => ['name','team','colour','color'].some(k => h.includes(k)));
+    let colName = 0, colColour = 1;
+    let startIdx = 0;
+    if (hasHeader) {
+      startIdx = 1;
+      firstRow.forEach((h, i) => {
+        if (h.includes('name') || h.includes('team')) colName   = i;
+        if (h.includes('colour') || h.includes('color')) colColour = i;
+      });
+    }
+    let added = 0, skipped = 0;
+    for (let i = startIdx; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.every(c => !c)) continue;
+      const name = String(row[colName] || '').trim();
+      if (!name) { skipped++; continue; }
+      const exists = State.teams.some(t => t.name.toLowerCase() === name.toLowerCase());
+      if (exists) { skipped++; continue; }
+      let colour = String(row[colColour] || '').trim();
+      // Accept hex colours with or without #
+      if (colour && !colour.startsWith('#')) colour = '#' + colour;
+      if (!/^#[0-9a-fA-F]{3,6}$/.test(colour)) colour = '#4a9eff';
+      State.addTeam({ name, colour });
+      added++;
+    }
+    this.renderTeams();
+    this.renderHome();
+    const msg = skipped > 0
+      ? `${added} imported, ${skipped} skipped (duplicates or missing name)`
+      : `${added} team${added !== 1 ? 's' : ''} imported`;
     this.toast(msg, 3000);
   },
 
@@ -747,16 +808,19 @@ const App = {
       const dayStr = d ? d.getDate() : '–';
       const monStr = d ? d.toLocaleString('default',{month:'short'}).toUpperCase() : '';
       const rating = m.assessment?.ratings?.overall || 'none';
-      return `<div class="match-item" onclick="App.openMatch('${m.id}')">
-        <div class="match-date-badge">
+      return `<div class="match-item">
+        <div class="match-date-badge" onclick="App.openMatch('${m.id}')">
           <div class="match-date-day">${dayStr}</div>
           <div class="match-date-mon">${monStr}</div>
         </div>
-        <div class="match-item-body">
+        <div class="match-item-body" onclick="App.openMatch('${m.id}')">
           <div class="match-item-teams">${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'}</div>
           <div class="match-item-sub">${m.competition || ''}${m.competition && m.venue ? ' · ' : ''}${m.venue || ''}</div>
         </div>
-        <div class="match-rating-dot ${rating}"></div>
+        <div class="match-rating-dot ${rating}" onclick="App.openMatch('${m.id}')"></div>
+        <button class="btn-icon btn-icon-danger match-del-btn" onclick="App.confirmDeleteMatchFromProfile('${m.id}')" aria-label="Delete match">
+          <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
       </div>`;
     }).join('');
   },
@@ -1735,6 +1799,22 @@ ${events.length > 0 ? `<div class="page-break"></div>
         this.onScreenEnter(Router.current());
       }
     );
+  },
+
+  confirmDeleteMatchFromProfile(matchId) {
+    const m = State.getMatch(matchId);
+    if (!m) return;
+    this.showModal(
+      'Delete Match?',
+      `${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'} will be permanently deleted. This cannot be undone.`,
+      'Delete',
+      'btn-modal-danger',
+      () => {
+        State.deleteMatch(matchId);
+        this.toast('Match deleted');
+        this.renderRefereeProfile();
+      }
+    );
   }
 };
 
@@ -1975,6 +2055,15 @@ const PhaseModal = {
 
 document.addEventListener('DOMContentLoaded', () => {
   App.renderHome();
+
+  // Dismiss splash after a brief moment
+  const splash = document.getElementById('splash');
+  if (splash) {
+    setTimeout(() => {
+      splash.classList.add('fade-out');
+      setTimeout(() => splash.classList.add('hidden'), 420);
+    }, 900);
+  }
 
   const liveNotes = document.getElementById('live-notes');
   if (liveNotes) liveNotes.addEventListener('input', () => App.saveLiveNotes());
