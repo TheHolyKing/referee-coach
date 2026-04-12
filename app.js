@@ -729,9 +729,18 @@ const App = {
     this._scoringTeam = null;
   },
 
-  applyScore(points) {
+  applyScore(points, label) {
     if (!this._scoringTeam) return;
     this.adjustScore(this._scoringTeam, points);
+    const match = State.getMatch(this.currentMatchId);
+    const teamName = this._scoringTeam === 'home' ? (match?.homeTeam || 'Home') : (match?.awayTeam || 'Away');
+    this.logEvent({
+      phase: 'Score',
+      possession: this._scoringTeam,
+      outcome: label || `+${points}`,
+      notes: `${teamName} — ${label || points + ' pts'} (+${points})`,
+      isScore: true,
+    });
     this.closeScorePicker();
   },
 
@@ -798,6 +807,15 @@ const App = {
         return `<div class="event-marker ${isHT ? 'marker-ht' : 'marker-ft'}">
           <span class="event-marker-time">${e.time}</span>
           <span class="event-marker-label">${e.phase}</span>
+          <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
+        </div>`;
+      }
+
+      // Score event
+      if (e.isScore) {
+        return `<div class="event-marker marker-score">
+          <span class="event-marker-time">${e.time}</span>
+          <span class="event-marker-label">&#9679; ${e.notes}</span>
           <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
         </div>`;
       }
@@ -1153,6 +1171,12 @@ const App = {
           <td colspan="7" style="text-align:center;font-weight:bold;letter-spacing:.5px;">${e.phase}</td>
         </tr>`;
       }
+      if (e.isScore) {
+        return `<tr style="background:#e8f4ff;">
+          <td style="white-space:nowrap;">${e.time}</td>
+          <td colspan="7" style="font-weight:bold;color:#1a3a6a;">&#9679; ${e.notes}</td>
+        </tr>`;
+      }
       const card = e.card === 'yellow' ? 'YC' : e.card === 'red' ? 'RC' : '';
       const outcome = e.phase === 'Critical' ? (e.notes || '') : (e.outcome || '');
       const infring = e.phase === 'Critical' ? '' : (e.infringement || '');
@@ -1205,7 +1229,8 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
 @page{size:A4;margin:0}
 @media print{body{background:white}.no-print{display:none!important}.page{box-shadow:none}}
 @media screen{.page{box-shadow:0 2px 10px rgba(0,0,0,.2);margin:12px auto}}
-.no-print{position:fixed;bottom:20px;right:20px;padding:10px 22px;background:#1a3a6a;color:white;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.no-print{position:fixed;bottom:20px;padding:10px 22px;background:#1a3a6a;color:white;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.no-print.print-btn{right:20px}.no-print.close-btn{left:20px;background:#555}
 /* header */
 .rh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:3px solid #1a3a6a}
 .rh-left h1{font-size:20px;font-weight:bold;color:#1a3a6a}
@@ -1252,7 +1277,8 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
 .hn{font-size:22px;font-weight:bold}
 .page-break{page-break-after:always}
 </style></head><body>
-<button class="no-print" onclick="window.print()">&#128438; Print / Save PDF</button>
+<button class="no-print close-btn" onclick="window.close()">&#8592; Close</button>
+<button class="no-print print-btn" onclick="window.print()">&#128438; Print / Save PDF</button>
 
 <div class="page">
   <div class="rh">

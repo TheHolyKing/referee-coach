@@ -634,6 +634,7 @@ html, body {
 
 .event-marker.marker-ht .event-marker-label { color: var(--warn); }
 .event-marker.marker-ft .event-marker-label { color: var(--accent2); }
+.event-marker.marker-score .event-marker-label { color: #a0e0ff; }
 
 .report-marker {
   display: flex;
