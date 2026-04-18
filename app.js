@@ -1137,10 +1137,14 @@ const App = {
                       : e.card === 'red'    ? '<span class="card-badge card-red">RC</span>'
                       : '';
 
-      return `<div class="event-entry">
+      const flagBadge = e.flagged ? '<span class="flag-badge">🚩 Review</span>' : '';
+      const flagClass = e.flagged ? ' event-flagged' : '';
+
+      return `<div class="event-entry${flagClass}">
         <span class="event-time">${e.time}</span>
         <span class="event-phase-badge ${badgeClass}">${e.phase}</span>
         <span class="event-body">${parts}</span>
+        ${flagBadge}
         ${cardBadge}
         ${against}
         <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
@@ -1352,9 +1356,11 @@ const App = {
     // Event summaries by phase
     const phaseCounts = {};
     const pkAgainst = { home: 0, away: 0 };
+    const flaggedEvents = [];
     events.forEach(e => {
       phaseCounts[e.phase] = (phaseCounts[e.phase] || 0) + 1;
       if (e.outcome === 'PK' && e.against) pkAgainst[e.against]++;
+      if (e.flagged) flaggedEvents.push(e);
     });
 
     // Build event log rows for report
@@ -1380,7 +1386,28 @@ const App = {
       </div>`;
     }).join('');
 
+    const flaggedRows = flaggedEvents.map(e => {
+      const parts = [
+        e.possession ? teamName(e.possession) : null,
+        e.position   ? posLabel[e.position]   : null,
+        e.outcome    || null,
+        e.infringement || null,
+        e.against    ? `→ against ${teamName(e.against)}` : null,
+        e.notes      || null,
+      ].filter(Boolean).join(' · ');
+      return `<div class="report-row report-row-flagged">
+        <span class="report-row-label">🚩 ${e.time} <strong>${e.phase}</strong></span>
+        <span class="report-row-val" style="font-size:13px;text-align:right;">${parts || '–'}</span>
+      </div>`;
+    }).join('');
+
     document.getElementById('report-content').innerHTML = `
+      ${flaggedEvents.length > 0 ? `
+      <div class="report-section report-section-review">
+        <div class="report-section-title">🚩 Review Items (${flaggedEvents.length})</div>
+        <div class="report-review-note">These moments were flagged during the match for post-match discussion.</div>
+        ${flaggedRows}
+      </div>` : ''}
       <div class="report-section">
         <div class="report-section-title">Match Information</div>
         <div class="report-row"><span class="report-row-label">Referee</span><span class="report-row-val">${ref ? ref.firstName + ' ' + ref.lastName : '–'}</span></div>
@@ -1544,6 +1571,25 @@ const App = {
     const awayScore = a.awayScore ?? match.liveData?.awayScore ?? 0;
     const overall   = a.ratings?.overall || '';
 
+    // ── flagged events ─────────────────────────────────────
+    const flaggedEvents = events.filter(e => e.flagged && !e.isMarker);
+    const flaggedPrintRows = flaggedEvents.map(e => {
+      const parts = [
+        e.possession ? teamName(e.possession) : null,
+        e.position   ? posLabel[e.position]   : null,
+        e.outcome    || null,
+        e.infringement || null,
+        e.against    ? `against ${teamName(e.against)}` : null,
+        e.notes      || null,
+      ].filter(Boolean).join(' · ');
+      return `<tr style="background:#fffbe6;border-left:3px solid #f0a500;">
+        <td style="white-space:nowrap;font-weight:bold;">🚩 ${e.time}</td>
+        <td><strong>${e.phase}</strong></td>
+        <td colspan="5">${parts || '–'}</td>
+        <td></td>
+      </tr>`;
+    }).join('');
+
     // ── HTML ───────────────────────────────────────────────
     const html = `<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
@@ -1633,6 +1679,16 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
     <div class="ir"><span class="il">Red Cards:</span><span class="iv">${a.redCards || 0}</span></div>
     <div class="ir"><span class="il">Events Logged:</span><span class="iv">${events.length}</span></div>
   </div>
+
+  ${flaggedEvents.length > 0 ? `
+  <div class="sec" style="border:2px solid #f0a500;border-radius:6px;padding:10px 12px;background:#fffbe6;">
+    <h2 style="color:#b07800;border-bottom-color:#f0a500;">🚩 Review Items (${flaggedEvents.length})</h2>
+    <p style="font-size:10px;color:#7a5a00;margin-bottom:8px;">These moments were flagged during the match for post-match discussion with the referee.</p>
+    <table class="nt">
+      <thead><tr><th>Time</th><th>Phase</th><th colspan="5">Details</th><th></th></tr></thead>
+      <tbody>${flaggedPrintRows}</tbody>
+    </table>
+  </div>` : ''}
 
   <div class="sec">
     <h2>Performance Assessment</h2>
@@ -1867,6 +1923,7 @@ const PhaseModal = {
   infringement: null,
   against:      null,
   card:         null,
+  flagged:      false,
   scrumResets:  0,    // count of resets logged for the current scrum
 
   open(phase) {
@@ -2047,6 +2104,7 @@ const PhaseModal = {
     this.infringement = null;
     this.against      = null;
     this.card         = null;
+    this.flagged      = false;
     this.scrumResets  = 0;
     document.querySelectorAll('.pm-opt-btn, .pm-pos-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('pm-team-home').classList.add('active');
@@ -2056,11 +2114,18 @@ const PhaseModal = {
     document.getElementById('pm-card-blue').classList.remove('active');
     document.getElementById('pm-card-yellow').classList.remove('active');
     document.getElementById('pm-card-red').classList.remove('active');
+    const flagBtn = document.getElementById('pm-flag-btn');
+    if (flagBtn) flagBtn.classList.remove('active');
     // Restore infringement label and buttons if we were in a scrum reset state
     const infLabel = document.getElementById('pm-infringement-label');
     if (infLabel) infLabel.textContent = 'Infringement';
     const counter = document.getElementById('pm-reset-counter');
     if (counter) counter.remove();
+  },
+
+  toggleFlag() {
+    this.flagged = !this.flagged;
+    document.getElementById('pm-flag-btn').classList.toggle('active', this.flagged);
   },
 
   cancel() {
@@ -2080,10 +2145,12 @@ const PhaseModal = {
       infringement: this.infringement,
       against:      this.phase === 'Critical' ? null : this.against,
       card:         this.card,
+      flagged:      this.flagged,
       notes,
     });
     const cardMsg = this.card ? ` + ${this.card === 'yellow' ? '🟡 Yellow' : this.card === 'blue' ? '🟦 Blue' : '🔴 Red'} card` : '';
-    App.toast(`${this.phase} logged${cardMsg}`);
+    const flagMsg = this.flagged ? ' · 🚩 Flagged' : '';
+    App.toast(`${this.phase} logged${cardMsg}${flagMsg}`);
     document.getElementById('phase-modal-overlay').classList.add('hidden');
   }
 };
