@@ -1,4 +1,4 @@
-const CACHE = 'refcoach-v17';
+const CACHE = 'refcoach-v18';
 const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
