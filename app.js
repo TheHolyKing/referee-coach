@@ -106,20 +106,20 @@ const State = {
 const PHASES = {
   'Scrum': {
     outcomes: ['Good','Reset','Wheeled','Collapsed','PK','FK','Advantage','Penalty Try'],
-    infringements: ['Boring In','Binding','Crooked Feed','Prop Collapse','Not Straight','Early Engagement','Popping','Pulling Down','No Push','Other'],
+    infringements: ['Boring In','Binding','Crooked Feed','Prop Collapse','Early Engagement','Popping','Pulling Down','Other'],
     resetReasons: ['Collapse','Early Engage','Same Tunnel','Standing Up']
   },
   'Lineout': {
-    outcomes: ['Good','Won Against','Disrupted','PK','FK','Advantage'],
+    outcomes: ['Good','Play On','Won Against','Disrupted','PK','FK','Advantage'],
     infringements: ['Not Straight','Lifting Early','Interference','Obstruction','Short Throw','Closing Gap','Off Feet','Offside','Other']
   },
   'Tackle': {
-    outcomes: ['Good','Slow','Played Away','PK','Unplayable','Missed'],
-    infringements: ['Tackler Release','Holding On','Not Rolling','Off Feet','Entry','Hands','Double Movement','Offside','No Arms','Other']
+    outcomes: ['Good','Slow','Played Away','PK','Unplayable'],
+    infringements: ['High Tackle','Croc Roll','No Arms','Tackler Release','Holding On','Not Rolling','Off Feet','Double Movement','Offside','Other']
   },
   'Ruck': {
     outcomes: ['Good','Slow','Turnover','Unplayable','Advantage','PK','Missed'],
-    infringements: ['Entry','Hands','Off Feet','Not Rolling','Bridging','Offside','No Arms','Neck Roll','Other']
+    infringements: ['Entry','Hands','Off Feet','Not Rolling','Bridging','Offside','Croc Roll','Other']
   },
   'Maul': {
     outcomes: ['Good','Slow','Turnover','Unplayable','PK','FK','Penalty Try','Collapsed'],
@@ -1078,7 +1078,7 @@ const App = {
     const events = match?.liveData?.events || [];
     const pkCount = { home: 0, away: 0 };
     events.forEach(e => {
-      if ((e.outcome === 'PK' || e.phase === 'Pen Gen Play') && e.against) {
+      if (e.outcome === 'PK' && e.against) {
         pkCount[e.against]++;
       }
     });
@@ -1133,6 +1133,7 @@ const App = {
       const against = e.against ? `<span class="event-against">vs ${teamName(e.against)}</span>` : '';
 
       const cardBadge = e.card === 'yellow' ? '<span class="card-badge card-yellow">YC</span>'
+                      : e.card === 'blue'   ? '<span class="card-badge card-blue">BC</span>'
                       : e.card === 'red'    ? '<span class="card-badge card-red">RC</span>'
                       : '';
 
@@ -1214,7 +1215,7 @@ const App = {
   //  ASSESSMENT
   // ══════════════════════════════════════════════════════
   _ratings: {},
-  _cards:   { yellow: 0, red: 0 },
+  _cards:   { yellow: 0, blue: 0, red: 0 },
 
   renderAssessment() {
     const match = State.getMatch(this.currentMatchId);
@@ -1238,13 +1239,16 @@ const App = {
     // Count cards from event log; fall back to manually entered counts
     const events = match.liveData?.events || [];
     const evYellow = events.filter(e => e.card === 'yellow').length;
+    const evBlue   = events.filter(e => e.card === 'blue').length;
     const evRed    = events.filter(e => e.card === 'red').length;
     this._cards = {
       yellow: a.yellowCards != null ? a.yellowCards : evYellow,
+      blue:   a.blueCards   != null ? a.blueCards   : evBlue,
       red:    a.redCards    != null ? a.redCards    : evRed
     };
 
     document.getElementById('count-yellow').textContent = this._cards.yellow;
+    document.getElementById('count-blue').textContent   = this._cards.blue;
     document.getElementById('count-red').textContent    = this._cards.red;
     document.getElementById('assess-observations').value = a.observations || match.liveData?.notes || '';
     document.getElementById('assess-strengths').value    = a.strengths    || '';
@@ -1301,6 +1305,7 @@ const App = {
       homeScore:      parseInt(document.getElementById('final-home-score').value, 10) || 0,
       awayScore:      parseInt(document.getElementById('final-away-score').value, 10) || 0,
       yellowCards:    this._cards.yellow,
+      blueCards:      this._cards.blue,
       redCards:       this._cards.red,
       observations:   document.getElementById('assess-observations').value.trim(),
       strengths:      document.getElementById('assess-strengths').value.trim(),
@@ -1349,7 +1354,7 @@ const App = {
     const pkAgainst = { home: 0, away: 0 };
     events.forEach(e => {
       phaseCounts[e.phase] = (phaseCounts[e.phase] || 0) + 1;
-      if ((e.outcome === 'PK' || e.phase === 'Pen Gen Play') && e.against) pkAgainst[e.against]++;
+      if (e.outcome === 'PK' && e.against) pkAgainst[e.against]++;
     });
 
     // Build event log rows for report
@@ -1388,6 +1393,7 @@ const App = {
         ${match.ar2 ? `<div class="report-row"><span class="report-row-label">AR2</span><span class="report-row-val">${match.ar2}</span></div>` : ''}
         ${match.tmo ? `<div class="report-row"><span class="report-row-label">TMO</span><span class="report-row-val">${match.tmo}</span></div>` : ''}
         <div class="report-row"><span class="report-row-label">Yellow Cards</span><span class="report-row-val">${a.yellowCards || 0}</span></div>
+        <div class="report-row"><span class="report-row-label">Blue Cards</span><span class="report-row-val">${a.blueCards || 0}</span></div>
         <div class="report-row"><span class="report-row-label">Red Cards</span><span class="report-row-val">${a.redCards || 0}</span></div>
       </div>
 
@@ -1453,7 +1459,7 @@ const App = {
 
     events.forEach(e => {
       if (e.isMarker) return;
-      const isPK = e.outcome === 'PK' || e.phase === 'Pen Gen Play';
+      const isPK = e.outcome === 'PK';
       if (isPK && e.against) {
         const t = e.against;
         pkAgainst[t]++;
@@ -1499,7 +1505,7 @@ const App = {
           <td colspan="7" style="font-weight:bold;color:${sc};">&#9679; ${e.notes}</td>
         </tr>`;
       }
-      const card = e.card === 'yellow' ? 'YC' : e.card === 'red' ? 'RC' : '';
+      const card = e.card === 'yellow' ? 'YC' : e.card === 'blue' ? 'BC' : e.card === 'red' ? 'RC' : '';
       const outcome = e.phase === 'Critical' ? (e.notes || '') : (e.outcome || '');
       const infring = e.phase === 'Critical' ? '' : (e.infringement || '');
       return `<tr>
@@ -1510,7 +1516,7 @@ const App = {
         <td>${outcome}</td>
         <td>${infring}</td>
         <td>${e.against ? teamName(e.against) : ''}</td>
-        <td style="text-align:center;font-weight:bold;color:${e.card==='red'?'#c00':e.card==='yellow'?'#b07800':'inherit'}">${card}</td>
+        <td style="text-align:center;font-weight:bold;color:${e.card==='red'?'#c00':e.card==='blue'?'#0055cc':e.card==='yellow'?'#b07800':'inherit'}">${card}</td>
       </tr>`;
     }).join('');
 
@@ -1623,6 +1629,7 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
     ${match.ar2 ? `<div class="ir"><span class="il">AR2:</span><span class="iv">${match.ar2}</span></div>` : '<div></div>'}
     ${match.tmo ? `<div class="ir"><span class="il">TMO:</span><span class="iv">${match.tmo}</span></div>` : '<div></div>'}
     <div class="ir"><span class="il">Yellow Cards:</span><span class="iv">${a.yellowCards || 0}</span></div>
+    <div class="ir"><span class="il">Blue Cards:</span><span class="iv">${a.blueCards || 0}</span></div>
     <div class="ir"><span class="il">Red Cards:</span><span class="iv">${a.redCards || 0}</span></div>
     <div class="ir"><span class="il">Events Logged:</span><span class="iv">${events.length}</span></div>
   </div>
@@ -1719,7 +1726,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
     const teamName = (t) => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
 
     const pkAgainst = { home: 0, away: 0 };
-    events.forEach(e => { if ((e.outcome === 'PK' || e.phase === 'Pen Gen Play') && e.against) pkAgainst[e.against]++; });
+    events.forEach(e => { if (e.outcome === 'PK' && e.against) pkAgainst[e.against]++; });
 
     const areaLines = AREAS.map(area => {
       const r = a.ratings?.[area.id] || 'Not rated';
@@ -1756,7 +1763,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
       `${match.homeTeam}: ${pkAgainst.home}`,
       `${match.awayTeam}: ${pkAgainst.away}`,
       ``,
-      `CARDS: Yellow ${a.yellowCards || 0}  Red ${a.redCards || 0}`,
+      `CARDS: Yellow ${a.yellowCards || 0}  Blue ${a.blueCards || 0}  Red ${a.redCards || 0}`,
       ``,
       events.length ? `EVENT LOG (${events.length})\n─────────────────\n${eventLines}` : '',
       ``,
@@ -2028,8 +2035,9 @@ const PhaseModal = {
   setCard(type) {
     // Toggle: tap same card again to deselect
     this.card = this.card === type ? null : type;
+    document.getElementById('pm-card-blue').classList.toggle('active',   this.card === 'blue');
     document.getElementById('pm-card-yellow').classList.toggle('active', this.card === 'yellow');
-    document.getElementById('pm-card-red').classList.toggle('active', this.card === 'red');
+    document.getElementById('pm-card-red').classList.toggle('active',    this.card === 'red');
   },
 
   reset() {
@@ -2045,6 +2053,7 @@ const PhaseModal = {
     document.getElementById('pm-team-away').classList.remove('active');
     document.getElementById('pm-against-home').classList.remove('active');
     document.getElementById('pm-against-away').classList.remove('active');
+    document.getElementById('pm-card-blue').classList.remove('active');
     document.getElementById('pm-card-yellow').classList.remove('active');
     document.getElementById('pm-card-red').classList.remove('active');
     // Restore infringement label and buttons if we were in a scrum reset state
@@ -2073,7 +2082,7 @@ const PhaseModal = {
       card:         this.card,
       notes,
     });
-    const cardMsg = this.card ? ` + ${this.card === 'yellow' ? '🟡 Yellow' : '🔴 Red'} card` : '';
+    const cardMsg = this.card ? ` + ${this.card === 'yellow' ? '🟡 Yellow' : this.card === 'blue' ? '🟦 Blue' : '🔴 Red'} card` : '';
     App.toast(`${this.phase} logged${cardMsg}`);
     document.getElementById('phase-modal-overlay').classList.add('hidden');
   }

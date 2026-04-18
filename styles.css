@@ -663,6 +663,7 @@ html, body {
 }
 
 .card-yellow { background: #f0c040; color: #000; }
+.card-blue   { background: #4a9eff; color: #fff; }
 .card-red    { background: var(--danger); color: #fff; }
 
 .event-against {
@@ -1463,6 +1464,12 @@ html, body {
   border-color: #f0c040;
   background: rgba(240,192,64,0.18);
   color: #f0c040;
+}
+
+.pm-card-blue.active {
+  border-color: #4a9eff;
+  background: rgba(74,158,255,0.18);
+  color: #4a9eff;
 }
 
 .pm-card-red.active {

@@ -326,9 +326,11 @@
         <button class="btn-phase" onclick="App.openPhase('Scrum')">Scrum</button>
         <button class="btn-phase" onclick="App.openPhase('Lineout')">Lineout</button>
         <button class="btn-phase" onclick="App.openPhase('Tackle')">Tackle</button>
-        <button class="btn-phase btn-phase-wide" onclick="App.openPhase('Pen Gen Play')">Pen Gen Play</button>
         <button class="btn-phase" onclick="App.openPhase('Ruck')">Ruck</button>
         <button class="btn-phase" onclick="App.openPhase('Maul')">Maul</button>
+        <button class="btn-phase" onclick="App.openPhase('Advantage')">Advantage</button>
+        <button class="btn-phase btn-phase-wide" onclick="App.openPhase('Pen Gen Play')">Pen Gen Play</button>
+        <button class="btn-phase btn-phase-wide" onclick="App.openPhase('Free Kick')">Free Kick</button>
         <button class="btn-phase btn-phase-critical btn-phase-wide" onclick="App.openPhase('Critical')">Critical</button>
       </div>
 
@@ -396,6 +398,7 @@
         <div id="pm-card-section">
           <div class="pm-section-label">Card Issued (optional)</div>
           <div class="pm-card-row">
+            <button class="pm-card-btn pm-card-blue"   id="pm-card-blue"   onclick="PhaseModal.setCard('blue')">🟦 Blue Card</button>
             <button class="pm-card-btn pm-card-yellow" id="pm-card-yellow" onclick="PhaseModal.setCard('yellow')">🟡 Yellow Card</button>
             <button class="pm-card-btn pm-card-red"    id="pm-card-red"    onclick="PhaseModal.setCard('red')">🔴 Red Card</button>
           </div>
@@ -471,6 +474,14 @@
               <button onclick="App.adjCard('yellow',-1)">−</button>
               <span id="count-yellow">0</span>
               <button onclick="App.adjCard('yellow',1)">+</button>
+            </div>
+          </div>
+          <div class="card-counter">
+            <label>Blue Cards</label>
+            <div class="counter-controls">
+              <button onclick="App.adjCard('blue',-1)">−</button>
+              <span id="count-blue">0</span>
+              <button onclick="App.adjCard('blue',1)">+</button>
             </div>
           </div>
           <div class="card-counter">
