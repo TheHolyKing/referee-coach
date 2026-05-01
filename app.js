@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -1865,10 +1865,49 @@ ${events.length > 0 ? `<div class="page-break"></div>
 
   applyUpdate() {
     navigator.serviceWorker.getRegistration().then(reg => {
-      if (reg && reg.waiting) {
+      if (reg?.waiting) {
+        // New SW is ready — activate it; controllerchange will trigger reload
         reg.waiting.postMessage('SKIP_WAITING');
+      } else if (reg) {
+        // SW still installing — poll briefly then reload regardless
+        reg.update();
+        let attempts = 0;
+        const poll = setInterval(() => {
+          attempts++;
+          if (reg.waiting) {
+            clearInterval(poll);
+            reg.waiting.postMessage('SKIP_WAITING');
+          } else if (attempts >= 6) {
+            clearInterval(poll);
+            window.location.reload();
+          }
+        }, 500);
+      } else {
+        window.location.reload();
       }
-    });
+    }).catch(() => window.location.reload());
+  },
+
+  checkForUpdates() {
+    const banner = document.getElementById('update-banner');
+    if (!banner.classList.contains('hidden')) {
+      this.applyUpdate();
+      return;
+    }
+    this.toast('Checking for updates…', 2500);
+    fetch('version.json?t=' + Date.now())
+      .then(r => r.json())
+      .then(({ version }) => {
+        if (version && version !== APP_VERSION) {
+          banner.classList.remove('hidden');
+          navigator.serviceWorker.getRegistration()
+            .then(reg => { if (reg) reg.update(); })
+            .catch(() => {});
+        } else {
+          this.toast(`Up to date — v${APP_VERSION}`, 2500);
+        }
+      })
+      .catch(() => this.toast('Could not check — are you online?', 2500));
   },
 
   shareReport() {
@@ -2317,34 +2356,42 @@ document.addEventListener('DOMContentLoaded', () => {
   if (liveNotes) liveNotes.addEventListener('input', () => App.saveLiveNotes());
 
   if ('serviceWorker' in navigator) {
-    // updateViaCache: 'none' forces the browser to always re-fetch sw.js from
-    // the network, bypassing HTTP cache — critical for reliable updates.
+    const showUpdateBanner = () =>
+      document.getElementById('update-banner').classList.remove('hidden');
+
+    // updateViaCache:'none' — browser always re-fetches sw.js, bypassing HTTP cache
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
 
-      // Proactively check for a new SW on every launch
-      reg.update();
+      // A new SW is already waiting from a previous visit — show banner now
+      if (reg.waiting) showUpdateBanner();
 
-      // Also compare version.json from the server against our built-in version.
-      // If they differ a new release is deployed — trigger another SW update so
-      // the waiting-worker flow starts even before the user closes and reopens.
-      fetch('version.json?t=' + Date.now())
-        .then(r => r.json())
-        .then(({ version }) => { if (version && version !== APP_VERSION) reg.update(); })
-        .catch(() => {});
-
-      // If a new SW is already waiting on first load, show banner immediately
-      if (reg.waiting) {
-        document.getElementById('update-banner').classList.remove('hidden');
-      }
-      // If a new SW installs while the app is open
+      // Listen for a new SW installing during this session
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            document.getElementById('update-banner').classList.remove('hidden');
+            showUpdateBanner();
           }
         });
       });
+
+      // Proactively check for a new SW on every launch
+      reg.update();
+
+      // Fetch version.json from the server (never cached — query string busts it).
+      // If the server version differs from our built-in APP_VERSION, show the
+      // banner immediately rather than waiting for the full SW install cycle.
+      // This is the primary trigger on iOS where the SW lifecycle can be delayed.
+      fetch('version.json?t=' + Date.now())
+        .then(r => r.json())
+        .then(({ version }) => {
+          if (version && version !== APP_VERSION) {
+            showUpdateBanner();
+            reg.update(); // start downloading new SW in background
+          }
+        })
+        .catch(() => {});
+
     }).catch(() => {});
 
     // After SKIP_WAITING, the new SW activates — reload to use it

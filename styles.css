@@ -1323,6 +1323,19 @@ html, body {
 .settings-about-row span:first-child { color: var(--text2); }
 .settings-about-row span:last-child  { font-weight: 600; }
 
+.btn-check-updates {
+  background: var(--accent-soft);
+  border: 1.5px solid rgba(79,130,247,0.3);
+  border-radius: 20px;
+  color: var(--accent);
+  font-size: 13px; font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+.btn-check-updates:active { background: rgba(79,130,247,0.28); }
+
 /* ── Pen team badge ── */
 .pen-team-badge { padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
 .pen-team-badge.home { background: var(--accent-soft); color: var(--accent); }
