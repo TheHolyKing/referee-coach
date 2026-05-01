@@ -967,6 +967,7 @@ const App = {
     this.currentMatchId = match.id;
     this.currentMatch   = match;
 
+    this._teamsSwapped = false;
     Timer.reset();
     this.nav('live-match');
     this.renderLiveMatch();
@@ -976,6 +977,13 @@ const App = {
   //  LIVE MATCH
   // ══════════════════════════════════════════════════════
   _editMode: false,
+  _teamsSwapped: false,
+
+  swapTeamSides() {
+    this._teamsSwapped = !this._teamsSwapped;
+    const tracker = document.querySelector('.score-tracker');
+    if (tracker) tracker.classList.toggle('swapped', this._teamsSwapped);
+  },
 
   renderLiveMatch() {
     const m = this.currentMatch;
@@ -993,6 +1001,9 @@ const App = {
     document.getElementById('live-notes').value = m.liveData?.notes || '';
     Timer.render();
     Timer.renderControls();
+    // Restore side swap state
+    const tracker = document.querySelector('.score-tracker');
+    if (tracker) tracker.classList.toggle('swapped', this._teamsSwapped);
   },
 
   renderScores() {
@@ -1161,7 +1172,10 @@ const App = {
 
   toggleTimer()    { Timer.toggle(); },
   pressHalfTime() {
+    const wasFirst = Timer.matchPhase === 'first';
     Timer.pressHalfTime();
+    // Auto-swap team sides at half time (teams change ends)
+    if (wasFirst) this.swapTeamSides();
     // Log a marker so the report shows half/full time in context
     const label = Timer.matchPhase === 'halftime' ? 'Half Time'
                 : Timer.matchPhase === 'fulltime'  ? 'Full Time'
@@ -1186,6 +1200,9 @@ const App = {
           State.saveMatches();
         }
         Timer.reset();
+        this._teamsSwapped = false;
+        const tracker = document.querySelector('.score-tracker');
+        if (tracker) tracker.classList.remove('swapped');
         document.getElementById('live-notes').value = '';
         this.renderScores();
         this.renderEventLog();

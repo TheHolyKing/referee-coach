@@ -307,7 +307,12 @@
             <button class="btn-score-plus" onclick="App.openScorePicker('home')">+</button>
           </div>
         </div>
-        <div class="score-divider">–</div>
+        <div class="score-divider">
+          <span class="score-dash">–</span>
+          <button class="btn-swap-sides" onclick="App.swapTeamSides()" aria-label="Swap team sides">
+            <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
+          </button>
+        </div>
         <div class="score-team">
           <div id="live-away-name" class="team-name">Away</div>
           <div class="score-controls">

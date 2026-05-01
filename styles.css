@@ -497,7 +497,31 @@ html, body {
   transition: background 0.1s;
 }
 .btn-score-plus:active, .btn-score-minus:active { background: var(--surface3); }
-.score-divider { font-size: 32px; color: var(--text3); padding: 0 6px; }
+.score-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+.score-dash { font-size: 32px; color: var(--text3); line-height: 1; }
+
+.btn-swap-sides {
+  background: none; border: none;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.btn-swap-sides svg { width: 18px; height: 18px; fill: currentColor; }
+.btn-swap-sides:active { color: var(--accent); background: var(--accent-soft); }
+
+/* When sides are swapped, teams flip position; data binding is unaffected */
+.score-tracker.swapped { flex-direction: row-reverse; }
+.score-tracker.swapped .btn-swap-sides { color: var(--accent); }
 
 /* ── Phase Buttons ── */
 .phase-buttons {
