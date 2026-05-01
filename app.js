@@ -362,6 +362,7 @@ const App = {
       case 'referee':         this.renderRefereeProfile(); break;
       case 'assessment':      this.renderAssessment(); break;
       case 'report':          this.renderReport(); break;
+      case 'settings':        this.renderSettings(); break;
     }
   },
 
@@ -1927,6 +1928,86 @@ ${events.length > 0 ? `<div class="page-break"></div>
         this.renderRefereeProfile();
       }
     );
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  SETTINGS / BACKUP
+  // ══════════════════════════════════════════════════════
+  renderSettings() {
+    const versionEl = document.getElementById('settings-version');
+    if (versionEl) versionEl.textContent = APP_VERSION;
+
+    const summary = document.getElementById('settings-summary');
+    if (!summary) return;
+    const matchCount = State.matches.length;
+    const assessed   = State.matches.filter(m => m.assessment).length;
+    summary.innerHTML = `
+      <div class="settings-about-row">
+        <span>Referees</span><span>${State.referees.length}</span>
+      </div>
+      <div class="settings-about-row">
+        <span>Teams</span><span>${State.teams.length}</span>
+      </div>
+      <div class="settings-about-row">
+        <span>Matches recorded</span><span>${matchCount}</span>
+      </div>
+      <div class="settings-about-row">
+        <span>Assessments completed</span><span>${assessed}</span>
+      </div>`;
+  },
+
+  exportData() {
+    const payload = {
+      appVersion: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      referees:   State.referees,
+      teams:      State.teams,
+      matches:    State.matches,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `referee-coach-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    this.toast('Backup exported');
+  },
+
+  importData(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let data;
+      try { data = JSON.parse(e.target.result); } catch { this.toast('Could not read file'); return; }
+      if (!Array.isArray(data.referees) || !Array.isArray(data.teams) || !Array.isArray(data.matches)) {
+        this.toast('Invalid backup file');
+        return;
+      }
+      const rCount = data.referees.length;
+      const tCount = data.teams.length;
+      const mCount = data.matches.length;
+      this.showModal(
+        'Import Backup?',
+        `This will replace all current data with ${rCount} referee${rCount!==1?'s':''}, ${tCount} team${tCount!==1?'s':''} and ${mCount} match${mCount!==1?'es':''} from the backup. Current data will be lost.`,
+        'Import & Replace',
+        null,
+        () => {
+          State.referees = data.referees;
+          State.teams    = data.teams;
+          State.matches  = data.matches;
+          State.saveReferees();
+          State.saveTeams();
+          State.saveMatches();
+          this.renderSettings();
+          this.renderHome();
+          this.toast(`Restored: ${rCount} referees, ${tCount} teams, ${mCount} matches`);
+        }
+      );
+    };
+    reader.readAsText(file);
   }
 };
 
