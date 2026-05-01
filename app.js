@@ -1,5 +1,7 @@
 'use strict';
 
+const APP_VERSION = '1.3.0';
+
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
 // ══════════════════════════════════════════════════════════
@@ -2192,7 +2194,21 @@ document.addEventListener('DOMContentLoaded', () => {
   if (liveNotes) liveNotes.addEventListener('input', () => App.saveLiveNotes());
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(reg => {
+    // updateViaCache: 'none' forces the browser to always re-fetch sw.js from
+    // the network, bypassing HTTP cache — critical for reliable updates.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+
+      // Proactively check for a new SW on every launch
+      reg.update();
+
+      // Also compare version.json from the server against our built-in version.
+      // If they differ a new release is deployed — trigger another SW update so
+      // the waiting-worker flow starts even before the user closes and reopens.
+      fetch('version.json?t=' + Date.now())
+        .then(r => r.json())
+        .then(({ version }) => { if (version && version !== APP_VERSION) reg.update(); })
+        .catch(() => {});
+
       // If a new SW is already waiting on first load, show banner immediately
       if (reg.waiting) {
         document.getElementById('update-banner').classList.remove('hidden');
