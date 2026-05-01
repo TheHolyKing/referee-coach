@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -427,8 +427,7 @@ const App = {
       const hs   = m.assessment?.homeScore ?? m.liveData?.homeScore ?? 0;
       const as_  = m.assessment?.awayScore ?? m.liveData?.awayScore ?? 0;
       const rating = m.assessment?.ratings?.overall || 'none';
-      const hasAssessment = !!m.assessment;
-      return `<div class="recent-match-item" onclick="App.openMatch('${m.id}')">
+      return `<div class="recent-match-item" data-id="${m.id}" onclick="App.openMatch('${m.id}')">
         <div class="recent-match-left">
           <div class="recent-match-teams">${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'}</div>
           <div class="recent-match-meta">${refName}${m.competition ? ' · ' + m.competition : ''} · ${dateStr}</div>
@@ -437,8 +436,68 @@ const App = {
           <div class="recent-match-score">${hs} – ${as_}</div>
           <div class="match-rating-dot ${rating}"></div>
         </div>
+        <div class="recent-swipe-hint">Delete</div>
       </div>`;
     }).join('');
+
+    if (!this._recentSwipeReady) {
+      this._setupRecentMatchSwipe(list);
+      this._recentSwipeReady = true;
+    }
+  },
+
+  _recentSwipeReady: false,
+
+  _setupRecentMatchSwipe(list) {
+    let startX, startY, activeItem;
+
+    list.addEventListener('touchstart', e => {
+      const el = e.target.closest('.recent-match-item');
+      if (!el) return;
+      activeItem = el;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      activeItem.style.transition = '';
+    }, { passive: true });
+
+    list.addEventListener('touchmove', e => {
+      if (!activeItem || startX == null) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (dy > 12 && Math.abs(dx) < dy) { activeItem = null; return; } // scrolling vertically
+      if (dx < 0) {
+        const clamped = Math.max(dx, -100);
+        activeItem.style.transform = `translateX(${clamped}px)`;
+        activeItem.style.opacity = String(Math.max(0.4, 1 + clamped / 120));
+      }
+    }, { passive: true });
+
+    list.addEventListener('touchend', e => {
+      if (!activeItem || startX == null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = Math.abs(e.changedTouches[0].clientY - startY);
+      const el = activeItem;
+      activeItem = null;
+
+      if (dx < -72 && dy < 40) {
+        // Committed — slide off and delete
+        el.style.transition = 'transform 0.22s ease-in, opacity 0.22s ease-in';
+        el.style.transform = 'translateX(-110%)';
+        el.style.opacity   = '0';
+        const matchId = el.dataset.id;
+        setTimeout(() => {
+          State.deleteMatch(matchId);
+          this._recentSwipeReady = false; // reset so listener rebinds after re-render
+          this.renderRecentMatches();
+          this.toast('Match removed');
+        }, 230);
+      } else {
+        // Snap back
+        el.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+        el.style.transform = '';
+        el.style.opacity   = '';
+      }
+    }, { passive: true });
   },
 
   // ══════════════════════════════════════════════════════
