@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -2069,6 +2069,10 @@ const PhaseModal = {
     // Set default team selection
     document.getElementById('pm-team-home').classList.add('active');
     document.getElementById('pm-team-away').classList.remove('active');
+
+    // Flip possession row to match scoreboard orientation when teams are swapped
+    const teamRow = document.querySelector('.pm-team-row');
+    if (teamRow) teamRow.style.flexDirection = App._teamsSwapped ? 'row-reverse' : '';
 
     // Rebuild field position buttons to match current team orientation.
     // When sides are swapped the physical left/right of the field reverses,
