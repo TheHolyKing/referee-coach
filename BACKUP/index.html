@@ -28,9 +28,6 @@
     <div id="screen-home" class="screen active">
       <header class="topbar">
         <h1>Referee Pro Coaching</h1>
-        <button class="btn-icon" onclick="App.nav('settings')" aria-label="Settings">
-          <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-        </button>
       </header>
       <div class="home-scroll">
         <div class="home-cards">
@@ -64,10 +61,6 @@
             </div>
             <div class="home-card-arrow">›</div>
           </button>
-        </div>
-        <div id="home-recent" class="home-recent-section hidden">
-          <div class="home-section-label">Recent Matches</div>
-          <div id="home-recent-list"></div>
         </div>
       </div>
     </div>
@@ -108,9 +101,6 @@
         </button>
       </header>
       <input type="file" id="import-teams-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="App.importTeams(this)">
-      <div class="search-bar">
-        <input type="search" id="team-search" placeholder="Search teams…" oninput="App.filterTeams(this.value)">
-      </div>
       <div id="team-list" class="list-container"></div>
     </div>
 
@@ -165,10 +155,6 @@
         <div class="form-group">
           <label>Last Name</label>
           <input type="text" id="ref-lastname" placeholder="Last name" autocomplete="family-name">
-        </div>
-        <div class="form-group">
-          <label>Grade / Level</label>
-          <input type="text" id="ref-grade" placeholder="e.g. Grade 3, Level 1">
         </div>
         <div class="form-group">
           <label>Union / Club</label>
@@ -301,7 +287,7 @@
             <div id="live-phase-badge" class="live-phase-badge"></div>
           </div>
         </div>
-        <button class="btn-assess" onclick="App.goToAssessment()">Assess</button>
+        <button class="btn-text" onclick="App.goToAssessment()">Assess</button>
       </header>
 
       <!-- Timer controls -->
@@ -321,12 +307,7 @@
             <button class="btn-score-plus" onclick="App.openScorePicker('home')">+</button>
           </div>
         </div>
-        <div class="score-divider">
-          <span class="score-dash">–</span>
-          <button class="btn-swap-sides" onclick="App.swapTeamSides()" aria-label="Swap team sides">
-            <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
-          </button>
-        </div>
+        <div class="score-divider">–</div>
         <div class="score-team">
           <div id="live-away-name" class="team-name">Away</div>
           <div class="score-controls">
@@ -337,40 +318,24 @@
         </div>
       </div>
 
-      <!-- Swap indicator -->
-      <div id="swap-indicator" class="swap-indicator hidden"></div>
-
-      <!-- Phase buttons grouped by category -->
-      <div class="phase-groups">
-        <div class="phase-group">
-          <div class="phase-group-label">Set Piece</div>
-          <div class="phase-group-buttons">
-            <button class="btn-phase" onclick="App.openPhase('Scrum')">Scrum</button>
-            <button class="btn-phase" onclick="App.openPhase('Lineout')">Lineout</button>
-          </div>
-        </div>
-        <div class="phase-group">
-          <div class="phase-group-label">Breakdown</div>
-          <div class="phase-group-buttons">
-            <button class="btn-phase" onclick="App.openPhase('Tackle')">Tackle</button>
-            <button class="btn-phase" onclick="App.openPhase('Ruck')">Ruck</button>
-            <button class="btn-phase" onclick="App.openPhase('Maul')">Maul</button>
-          </div>
-        </div>
-        <div class="phase-group">
-          <div class="phase-group-label">General Play</div>
-          <div class="phase-group-buttons">
-            <button class="btn-phase" onclick="App.openPhase('Advantage')">Advantage</button>
-            <button class="btn-phase" onclick="App.openPhase('Pen Gen Play')">Pen Gen Play</button>
-            <button class="btn-phase" onclick="App.openPhase('Free Kick')">Free Kick</button>
-          </div>
-        </div>
-        <button class="btn-phase btn-phase-critical btn-phase-full" onclick="App.openPhase('Critical')">⚠ Critical Incident</button>
+      <!-- Phase buttons -->
+      <div class="section-header">Log Event</div>
+      <div class="phase-buttons">
+        <button class="btn-phase" onclick="App.openPhase('Scrum')">Scrum</button>
+        <button class="btn-phase" onclick="App.openPhase('Lineout')">Lineout</button>
+        <button class="btn-phase" onclick="App.openPhase('Tackle')">Tackle</button>
+        <button class="btn-phase" onclick="App.openPhase('Ruck')">Ruck</button>
+        <button class="btn-phase" onclick="App.openPhase('Maul')">Maul</button>
+        <button class="btn-phase" onclick="App.openPhase('Advantage')">Advantage</button>
+        <button class="btn-phase btn-phase-wide" onclick="App.openPhase('Pen Gen Play')">Pen Gen Play</button>
+        <button class="btn-phase btn-phase-wide" onclick="App.openPhase('Free Kick')">Free Kick</button>
+        <button class="btn-phase btn-phase-critical btn-phase-wide" onclick="App.openPhase('Critical')">Critical</button>
       </div>
 
-      <!-- Event log — tap an entry to select it, then tap × to delete -->
+      <!-- Event log -->
       <div class="event-log-header">
         <span id="event-log-title">Events (0)</span>
+        <button class="btn-edit-entries" onclick="App.toggleEditEntries()">Edit Entries</button>
       </div>
       <div id="event-log-list" class="event-log"></div>
 
@@ -495,10 +460,7 @@
         </div>
 
         <!-- Assessment areas -->
-        <div class="section-header-row">
-          <span class="section-header" style="padding:16px 0 8px;">Performance Areas</span>
-          <span id="assessment-progress" class="assessment-progress">0 of 8 rated</span>
-        </div>
+        <div class="section-header">Performance Areas</div>
 
         <div id="assessment-areas">
           <!-- Rendered by JS -->
@@ -585,7 +547,6 @@
           Delete Match
         </button>
       </div>
-      <div id="report-score-banner" class="report-score-banner"></div>
       <div id="report-content" class="report-body"></div>
       <div style="height: 40px;"></div>
     </div>
@@ -613,63 +574,6 @@
           <button id="modal-cancel" class="btn-modal btn-modal-cancel" onclick="App.closeModal()">Cancel</button>
           <button id="modal-confirm" class="btn-modal btn-modal-confirm">Confirm</button>
         </div>
-      </div>
-    </div>
-
-    <!-- ═══════════════════ SCREEN: SETTINGS ═══════════════════ -->
-    <div id="screen-settings" class="screen">
-      <header class="topbar">
-        <button class="btn-back" onclick="App.back()">
-          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-        </button>
-        <h1>Settings</h1>
-      </header>
-      <div class="settings-body">
-
-        <div class="section-header">Your Data</div>
-        <p class="settings-note">All referees, teams and match history are stored on this device. Export a backup before switching devices or if you need to reinstall the app.</p>
-
-        <div class="settings-actions">
-          <button class="settings-btn" onclick="App.exportData()">
-            <div class="settings-btn-icon">
-              <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
-            </div>
-            <div class="settings-btn-body">
-              <div class="settings-btn-title">Export Backup</div>
-              <div class="settings-btn-sub">Download all data as a .json file</div>
-            </div>
-          </button>
-          <button class="settings-btn" onclick="document.getElementById('import-data-file').click()">
-            <div class="settings-btn-icon">
-              <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
-            </div>
-            <div class="settings-btn-body">
-              <div class="settings-btn-title">Import Backup</div>
-              <div class="settings-btn-sub">Restore from a previously exported file</div>
-            </div>
-          </button>
-          <input type="file" id="import-data-file" accept=".json" style="display:none" onchange="App.importData(this)">
-        </div>
-
-        <div class="section-header">Summary</div>
-        <div class="settings-summary" id="settings-summary"></div>
-
-        <div class="section-header">About</div>
-        <div class="settings-about">
-          <div class="settings-about-row">
-            <span>App Version</span>
-            <span id="settings-version"></span>
-          </div>
-          <div class="settings-about-row">
-            <span>Data stored on</span>
-            <span>This device only</span>
-          </div>
-          <div class="settings-about-row">
-            <span>Updates</span>
-            <button class="btn-check-updates" onclick="App.checkForUpdates()">Check now</button>
-          </div>
-        </div>
-
       </div>
     </div>
 

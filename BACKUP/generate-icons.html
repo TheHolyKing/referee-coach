@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<!-- Open this file in a browser, then right-click each canvas and "Save image as" to icons/icon-192.png and icons/icon-512.png -->
+<body style="background:#111;padding:20px;font-family:sans-serif;color:white;">
+<p>Right-click each image below → "Save Image As" → save to the <strong>icons/</strong> folder.</p>
+<canvas id="c192" width="192" height="192"></canvas>
+<canvas id="c512" width="512" height="512"></canvas>
+<script>
+function drawIcon(canvas) {
+  const size = canvas.width;
+  const ctx = canvas.getContext('2d');
+  const r = size * 0.18;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, '#16213e');
+  bg.addColorStop(1, '#0f3460');
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, size, size, r);
+  ctx.fill();
+
+  // Rugby ball (oval)
+  ctx.save();
+  ctx.translate(size/2, size/2);
+  ctx.fillStyle = '#a0522d';
+  ctx.strokeStyle = '#d4a96a';
+  ctx.lineWidth = size * 0.025;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size*0.3, size*0.18, Math.PI/5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Laces
+  ctx.strokeStyle = '#fffde7';
+  ctx.lineWidth = size * 0.018;
+  ctx.beginPath();
+  ctx.moveTo(-size*0.05, 0);
+  ctx.lineTo(size*0.05, 0);
+  ctx.stroke();
+  ctx.lineWidth = size * 0.012;
+  for (let x = -size*0.03; x <= size*0.04; x += size*0.03) {
+    ctx.beginPath();
+    ctx.moveTo(x, -size*0.055);
+    ctx.lineTo(x, size*0.055);
+    ctx.stroke();
+  }
+
+  // Whistle
+  ctx.restore();
+  ctx.fillStyle = '#c0c0c0';
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = size * 0.02;
+  const wx = size * 0.62, wy = size * 0.65, wr = size * 0.07;
+  ctx.beginPath();
+  ctx.arc(wx, wy, wr, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#888';
+  ctx.beginPath();
+  ctx.arc(wx, wy, wr * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Whistle body
+  ctx.fillStyle = '#c0c0c0';
+  ctx.beginPath();
+  ctx.roundRect(wx + wr * 0.7, wy - wr * 0.4, wr * 1.8, wr * 0.8, wr * 0.3);
+  ctx.fill();
+
+  // "RC" text
+  ctx.fillStyle = '#4a9eff';
+  ctx.font = `bold ${size * 0.1}px -apple-system, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('RC', size/2, size * 0.9);
+}
+
+drawIcon(document.getElementById('c192'));
+drawIcon(document.getElementById('c512'));
+</script>
+</body>
+</html>

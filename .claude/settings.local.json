@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(git config --global user.name)",
+      "PowerShell(git config --global user.email)",
+      "PowerShell(gh auth status 2>&1)",
+      "PowerShell(Get-Command git -ErrorAction SilentlyContinue; Get-ChildItem \"C:\\\\Program Files\\\\Git\\\\bin\" -ErrorAction SilentlyContinue | Select-Object -First 5; $env:PATH -split ';' | Where-Object { $_ -match 'git' })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\xavie\\\\AppData\\\\Local\\\\Programs\" -ErrorAction SilentlyContinue | Select-Object Name; Get-ChildItem \"C:\\\\Program Files\\\\\" -ErrorAction SilentlyContinue | Where-Object {$_.Name -match 'git'})",
+      "PowerShell(winget --version)",
+      "PowerShell(winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); git --version)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Set-Location \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\REFEREE\"; git clone https://github.com/TheHolyKing/referee-coach .)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Set-Location \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\"; git clone https://github.com/TheHolyKing/referee-coach referee-coach-temp)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Get-ChildItem \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\referee-coach-temp\" -Force)",
+      "PowerShell($src = \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\referee-coach-temp\"; $dst = \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\REFEREE\"; Get-ChildItem $src -Force | Where-Object { $_.Name -ne \".git\" } | ForEach-Object { Move-Item $_.FullName $dst -Force }; Write-Host \"Files moved.\")",
+      "PowerShell(# Move the .git folder too so REFEREE is a proper git repo $src = \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\referee-coach-temp\"; $dst = \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\REFEREE\"; Move-Item \"$src\\\\.git\" $dst -Force; Remove-Item $src -Recurse -Force; Write-Host \"Done.\")",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Set-Location \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\REFEREE\"; git log --oneline -5; Write-Host \"---\"; Get-ChildItem -Force | Select-Object Name, Mode, Length)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); Set-Location \"c:\\\\Users\\\\xavie\\\\OneDrive\\\\Documents\\\\PROJECTS\\\\REFEREE\"; git log --oneline -5)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)",
+      "Bash(git push *)"
+    ]
+  }
+}

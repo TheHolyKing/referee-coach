@@ -1,7 +1,5 @@
 'use strict';
 
-const APP_VERSION = '1.5.0';
-
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
 // ══════════════════════════════════════════════════════════
@@ -352,11 +350,7 @@ const App = {
     switch(screen) {
       case 'home':            this.renderHome(); break;
       case 'referees':        this.renderRefereeList(); break;
-      case 'teams':
-        const ts = document.getElementById('team-search');
-        if (ts) ts.value = '';
-        this.renderTeams();
-        break;
+      case 'teams':           this.renderTeams(); break;
       case 'new-team':        this.prefillTeamForm(); break;
       case 'new-match-select':
         const si = document.getElementById('select-referee-search');
@@ -366,7 +360,6 @@ const App = {
       case 'referee':         this.renderRefereeProfile(); break;
       case 'assessment':      this.renderAssessment(); break;
       case 'report':          this.renderReport(); break;
-      case 'settings':        this.renderSettings(); break;
     }
   },
 
@@ -404,41 +397,6 @@ const App = {
     const teamEl = document.getElementById('home-team-count');
     if (refEl)  refEl.textContent  = rc + ' referee' + (rc !== 1 ? 's' : '');
     if (teamEl) teamEl.textContent = tc + ' team' + (tc !== 1 ? 's' : '');
-    this.renderRecentMatches();
-  },
-
-  renderRecentMatches() {
-    const section = document.getElementById('home-recent');
-    const list    = document.getElementById('home-recent-list');
-    if (!section || !list) return;
-
-    const recent = [...State.matches]
-      .sort((a, b) => (b.date || b.createdAt || 0) - (a.date || a.createdAt || 0))
-      .slice(0, 5);
-
-    if (recent.length === 0) { section.classList.add('hidden'); return; }
-    section.classList.remove('hidden');
-
-    list.innerHTML = recent.map(m => {
-      const ref  = State.getReferee(m.refereeId);
-      const refName = ref ? ref.firstName + ' ' + ref.lastName : 'Unknown';
-      const d    = m.date ? new Date(m.date) : null;
-      const dateStr = d ? d.toLocaleDateString('en-AU', { day:'numeric', month:'short' }) : '–';
-      const hs   = m.assessment?.homeScore ?? m.liveData?.homeScore ?? 0;
-      const as_  = m.assessment?.awayScore ?? m.liveData?.awayScore ?? 0;
-      const rating = m.assessment?.ratings?.overall || 'none';
-      const hasAssessment = !!m.assessment;
-      return `<div class="recent-match-item" onclick="App.openMatch('${m.id}')">
-        <div class="recent-match-left">
-          <div class="recent-match-teams">${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'}</div>
-          <div class="recent-match-meta">${refName}${m.competition ? ' · ' + m.competition : ''} · ${dateStr}</div>
-        </div>
-        <div class="recent-match-right">
-          <div class="recent-match-score">${hs} – ${as_}</div>
-          <div class="match-rating-dot ${rating}"></div>
-        </div>
-      </div>`;
-    }).join('');
   },
 
   // ══════════════════════════════════════════════════════
@@ -478,21 +436,15 @@ const App = {
   // ══════════════════════════════════════════════════════
   //  TEAMS SCREEN
   // ══════════════════════════════════════════════════════
-  renderTeams(filter = '') {
+  renderTeams() {
     const list = document.getElementById('team-list');
     if (!list) return;
-    const teams = [...State.teams]
-      .filter(t => !filter || t.name.toLowerCase().includes(filter.toLowerCase()))
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    if (State.teams.length === 0) {
+    const teams = [...State.teams].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (teams.length === 0) {
       list.innerHTML = `<div class="empty-state">
         <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
         <p>No teams yet.\nTap + to add your first team.</p>
       </div>`;
-      return;
-    }
-    if (teams.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>No teams match "${filter}".</p></div>`;
       return;
     }
     list.innerHTML = teams.map(t => `
@@ -505,8 +457,6 @@ const App = {
         <div class="list-chevron">›</div>
       </div>`).join('');
   },
-
-  filterTeams(val) { this.renderTeams(val); },
 
   openTeam(id) {
     this.editingTeamId = id;
@@ -816,7 +766,6 @@ const App = {
     const data = {
       firstName: fn,
       lastName:  ln,
-      grade:     document.getElementById('ref-grade')?.value.trim() || '',
       union:     document.getElementById('ref-union').value.trim(),
       email:     document.getElementById('ref-email').value.trim(),
     };
@@ -842,8 +791,6 @@ const App = {
     this.editingRefereeId = ref.id;
     document.getElementById('ref-firstname').value = ref.firstName || '';
     document.getElementById('ref-lastname').value  = ref.lastName  || '';
-    const gradeEl = document.getElementById('ref-grade');
-    if (gradeEl) gradeEl.value = ref.grade || '';
     document.getElementById('ref-union').value     = ref.union     || '';
     document.getElementById('ref-email').value     = ref.email     || '';
     this.nav('new-referee');
@@ -891,8 +838,6 @@ const App = {
       const dayStr = d ? d.getDate() : '–';
       const monStr = d ? d.toLocaleString('default',{month:'short'}).toUpperCase() : '';
       const rating = m.assessment?.ratings?.overall || 'none';
-      const hs = m.assessment?.homeScore ?? m.liveData?.homeScore ?? 0;
-      const as_ = m.assessment?.awayScore ?? m.liveData?.awayScore ?? 0;
       return `<div class="match-item">
         <div class="match-date-badge" onclick="App.openMatch('${m.id}')">
           <div class="match-date-day">${dayStr}</div>
@@ -900,10 +845,7 @@ const App = {
         </div>
         <div class="match-item-body" onclick="App.openMatch('${m.id}')">
           <div class="match-item-teams">${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'}</div>
-          <div class="match-item-sub">
-            <span class="match-item-score">${hs} – ${as_}</span>
-            ${m.competition ? ' · ' + m.competition : ''}
-          </div>
+          <div class="match-item-sub">${m.competition || ''}${m.competition && m.venue ? ' · ' : ''}${m.venue || ''}</div>
         </div>
         <div class="match-rating-dot ${rating}" onclick="App.openMatch('${m.id}')"></div>
         <button class="btn-icon btn-icon-danger match-del-btn" onclick="App.confirmDeleteMatchFromProfile('${m.id}')" aria-label="Delete match">
@@ -965,7 +907,7 @@ const App = {
   prefillMatchSetup() {
     const today = new Date().toISOString().slice(0,10);
     document.getElementById('match-date').value = today;
-    document.getElementById('match-competition').value = DB.load('lastCompetition', '');
+    document.getElementById('match-competition').value = '';
     document.getElementById('match-home').value = '';
     document.getElementById('match-away').value = '';
     document.getElementById('match-venue').value = '';
@@ -1021,12 +963,10 @@ const App = {
       }
     };
 
-    if (matchData.competition) DB.save('lastCompetition', matchData.competition);
     const match = State.addMatch(matchData);
     this.currentMatchId = match.id;
     this.currentMatch   = match;
 
-    this._teamsSwapped = false;
     Timer.reset();
     this.nav('live-match');
     this.renderLiveMatch();
@@ -1036,25 +976,6 @@ const App = {
   //  LIVE MATCH
   // ══════════════════════════════════════════════════════
   _editMode: false,
-  _teamsSwapped: false,
-
-  swapTeamSides() {
-    this._teamsSwapped = !this._teamsSwapped;
-    const tracker = document.querySelector('.score-tracker');
-    if (tracker) tracker.classList.toggle('swapped', this._teamsSwapped);
-    this._renderSwapIndicator();
-  },
-
-  _renderSwapIndicator() {
-    const el = document.getElementById('swap-indicator');
-    if (!el) return;
-    if (!this._teamsSwapped) { el.classList.add('hidden'); return; }
-    const m = this.currentMatch;
-    const hn = m?.homeTeam || 'Home';
-    const an = m?.awayTeam || 'Away';
-    el.classList.remove('hidden');
-    el.innerHTML = `<span class="swap-ind-team">${an}</span><span class="swap-ind-arrow">↔</span><span class="swap-ind-team">${hn}</span>`;
-  },
 
   renderLiveMatch() {
     const m = this.currentMatch;
@@ -1072,9 +993,6 @@ const App = {
     document.getElementById('live-notes').value = m.liveData?.notes || '';
     Timer.render();
     Timer.renderControls();
-    const tracker = document.querySelector('.score-tracker');
-    if (tracker) tracker.classList.toggle('swapped', this._teamsSwapped);
-    this._renderSwapIndicator();
   },
 
   renderScores() {
@@ -1146,11 +1064,13 @@ const App = {
     this.renderEventLog();
   },
 
-  selectEvent(el) {
+  toggleEditEntries() {
+    this._editMode = !this._editMode;
+    const btn = document.querySelector('.btn-edit-entries');
     const log = document.getElementById('event-log-list');
-    const already = el.classList.contains('selected');
-    log.querySelectorAll('.event-entry.selected, .event-marker.selected').forEach(e => e.classList.remove('selected'));
-    if (!already) el.classList.add('selected');
+    btn.classList.toggle('active', this._editMode);
+    log.classList.toggle('edit-mode', this._editMode);
+    btn.textContent = this._editMode ? 'Done' : 'Edit Entries';
   },
 
   renderEventLog() {
@@ -1172,10 +1092,8 @@ const App = {
       return;
     }
 
-    const hn = match?.homeTeam || 'Home';
-    const an = match?.awayTeam || 'Away';
-    const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
-    const teamName = (t) => t === 'home' ? hn : an;
+    const posLabel = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
+    const teamName = (t) => t === 'home' ? (match?.homeTeam || 'Home') : (match?.awayTeam || 'Away');
     const isCritical = (e) => e.phase === 'Critical';
     const isPK = (e) => e.outcome === 'PK' || e.phase === 'Pen Gen Play';
 
@@ -1183,10 +1101,10 @@ const App = {
       // Half Time / Full Time marker
       if (e.isMarker) {
         const isHT = e.phase === 'Half Time';
-        return `<div class="event-marker ${isHT ? 'marker-ht' : 'marker-ft'}" onclick="App.selectEvent(this)">
+        return `<div class="event-marker ${isHT ? 'marker-ht' : 'marker-ft'}">
           <span class="event-marker-time">${e.time}</span>
           <span class="event-marker-label">${e.phase}</span>
-          <button class="event-del" onclick="event.stopPropagation();App.deleteEvent('${e.id}')">×</button>
+          <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
         </div>`;
       }
 
@@ -1195,10 +1113,10 @@ const App = {
         const scoreColour = e.possession === 'home'
           ? (match?.homeColour || 'var(--accent)')
           : (match?.awayColour || 'var(--accent2)');
-        return `<div class="event-marker marker-score" style="border-left:4px solid ${scoreColour};" onclick="App.selectEvent(this)">
+        return `<div class="event-marker marker-score" style="border-left:4px solid ${scoreColour};">
           <span class="event-marker-time">${e.time}</span>
           <span class="event-marker-label" style="color:${scoreColour};">&#9679; ${e.notes}</span>
-          <button class="event-del" onclick="event.stopPropagation();App.deleteEvent('${e.id}')">×</button>
+          <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
         </div>`;
       }
 
@@ -1222,14 +1140,14 @@ const App = {
       const flagBadge = e.flagged ? '<span class="flag-badge">🚩 Review</span>' : '';
       const flagClass = e.flagged ? ' event-flagged' : '';
 
-      return `<div class="event-entry${flagClass}" onclick="App.selectEvent(this)">
+      return `<div class="event-entry${flagClass}">
         <span class="event-time">${e.time}</span>
         <span class="event-phase-badge ${badgeClass}">${e.phase}</span>
         <span class="event-body">${parts}</span>
         ${flagBadge}
         ${cardBadge}
         ${against}
-        <button class="event-del" onclick="event.stopPropagation();App.deleteEvent('${e.id}')">×</button>
+        <button class="event-del" onclick="App.deleteEvent('${e.id}')">×</button>
       </div>`;
     }).join('');
   },
@@ -1243,10 +1161,7 @@ const App = {
 
   toggleTimer()    { Timer.toggle(); },
   pressHalfTime() {
-    const wasFirst = Timer.matchPhase === 'first';
     Timer.pressHalfTime();
-    // Auto-swap team sides at half time (teams change ends)
-    if (wasFirst) this.swapTeamSides();
     // Log a marker so the report shows half/full time in context
     const label = Timer.matchPhase === 'halftime' ? 'Half Time'
                 : Timer.matchPhase === 'fulltime'  ? 'Full Time'
@@ -1271,9 +1186,6 @@ const App = {
           State.saveMatches();
         }
         Timer.reset();
-        this._teamsSwapped = false;
-        const tracker = document.querySelector('.score-tracker');
-        if (tracker) tracker.classList.remove('swapped');
         document.getElementById('live-notes').value = '';
         this.renderScores();
         this.renderEventLog();
@@ -1369,16 +1281,6 @@ const App = {
     document.querySelectorAll('[data-area="overall"]').forEach(btn => {
       btn.classList.toggle('selected', btn.dataset.val === this._ratings.overall);
     });
-    this._updateAssessmentProgress();
-  },
-
-  _updateAssessmentProgress() {
-    const rated = AREAS.filter(a => this._ratings[a.id]).length;
-    const el = document.getElementById('assessment-progress');
-    if (el) {
-      el.textContent = `${rated} of ${AREAS.length} rated`;
-      el.className = 'assessment-progress' + (rated === AREAS.length ? ' complete' : '');
-    }
   },
 
   setRating(btn) {
@@ -1388,7 +1290,6 @@ const App = {
     document.querySelectorAll(`[data-area="${area}"]`).forEach(b => {
       b.classList.toggle('selected', b.dataset.val === val);
     });
-    this._updateAssessmentProgress();
   },
 
   adjCard(type, delta) {
@@ -1445,26 +1346,11 @@ const App = {
 
     const ref    = State.getReferee(match.refereeId);
     const a      = match.assessment || {};
-
-    // Populate score banner at the top of the report
-    const scoreBanner = document.getElementById('report-score-banner');
-    if (scoreBanner) {
-      const hs = a.homeScore ?? match.liveData?.homeScore ?? 0;
-      const as_ = a.awayScore ?? match.liveData?.awayScore ?? 0;
-      const overall = a.ratings?.overall || '';
-      scoreBanner.innerHTML = `
-        <span class="rpt-banner-team">${match.homeTeam || 'Home'}</span>
-        <span class="rpt-banner-score">${hs} – ${as_}</span>
-        <span class="rpt-banner-team">${match.awayTeam || 'Away'}</span>
-        ${overall ? `<span class="rpt-banner-rating rating-badge ${overall}">${overall}</span>` : ''}`;
-    }
     const events = match.liveData?.events || [];
     const date   = match.date ? new Date(match.date).toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric'}) : 'Unknown date';
 
-    const hn = match.homeTeam || 'Home';
-    const an = match.awayTeam || 'Away';
-    const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
-    const teamName = (t) => t === 'home' ? hn : an;
+    const posLabel = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
+    const teamName = (t) => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
     const ratingBadge = (r) => r ? `<span class="rating-badge ${r}">${r}</span>` : '<span style="color:var(--text2)">Not rated</span>';
 
     // Event summaries by phase
@@ -1589,10 +1475,8 @@ const App = {
       ? new Date(match.date).toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
       : 'Unknown date';
 
-    const hn = match.homeTeam || 'Home';
-    const an = match.awayTeam || 'Away';
-    const teamName  = t => t === 'home' ? hn : an;
-    const posLabel  = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
+    const teamName  = t => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
+    const posLabel  = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
 
     // ── stats ──────────────────────────────────────────────
     const pkAgainst    = { home: 0, away: 0 };
@@ -1666,10 +1550,10 @@ const App = {
     // ── heat map ───────────────────────────────────────────
     const positions = ['22-home','half-home','half-away','22-away'];
     const posLabels = {
-      '22-home':   `${hn} 22`,
-      'half-home': `${hn} Half`,
-      'half-away': `${an} Half`,
-      '22-away':   `${an} 22`,
+      '22-home':   (match.homeTeam || 'Home') + ' 22',
+      'half-home': (match.homeTeam || 'Home') + ' Half',
+      'half-away': (match.awayTeam || 'Away') + ' Half',
+      '22-away':   (match.awayTeam || 'Away') + ' 22',
     };
     const maxPos = Math.max(1, ...Object.values(allPkByPos));
     const heatCells = positions.map(pos => {
@@ -1894,10 +1778,8 @@ ${events.length > 0 ? `<div class="page-break"></div>
     const events = match.liveData?.events || [];
     const date   = match.date ? new Date(match.date).toLocaleDateString('en-AU') : '';
 
-    const hn = match.homeTeam || 'Home';
-    const an = match.awayTeam || 'Away';
-    const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
-    const teamName = (t) => t === 'home' ? hn : an;
+    const posLabel = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
+    const teamName = (t) => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
 
     const pkAgainst = { home: 0, away: 0 };
     events.forEach(e => { if (e.outcome === 'PK' && e.against) pkAgainst[e.against]++; });
@@ -1955,49 +1837,10 @@ ${events.length > 0 ? `<div class="page-break"></div>
 
   applyUpdate() {
     navigator.serviceWorker.getRegistration().then(reg => {
-      if (reg?.waiting) {
-        // New SW is ready — activate it; controllerchange will trigger reload
+      if (reg && reg.waiting) {
         reg.waiting.postMessage('SKIP_WAITING');
-      } else if (reg) {
-        // SW still installing — poll briefly then reload regardless
-        reg.update();
-        let attempts = 0;
-        const poll = setInterval(() => {
-          attempts++;
-          if (reg.waiting) {
-            clearInterval(poll);
-            reg.waiting.postMessage('SKIP_WAITING');
-          } else if (attempts >= 6) {
-            clearInterval(poll);
-            window.location.reload();
-          }
-        }, 500);
-      } else {
-        window.location.reload();
       }
-    }).catch(() => window.location.reload());
-  },
-
-  checkForUpdates() {
-    const banner = document.getElementById('update-banner');
-    if (!banner.classList.contains('hidden')) {
-      this.applyUpdate();
-      return;
-    }
-    this.toast('Checking for updates…', 2500);
-    fetch('version.json?t=' + Date.now())
-      .then(r => r.json())
-      .then(({ version }) => {
-        if (version && version !== APP_VERSION) {
-          banner.classList.remove('hidden');
-          navigator.serviceWorker.getRegistration()
-            .then(reg => { if (reg) reg.update(); })
-            .catch(() => {});
-        } else {
-          this.toast(`Up to date — v${APP_VERSION}`, 2500);
-        }
-      })
-      .catch(() => this.toast('Could not check — are you online?', 2500));
+    });
   },
 
   shareReport() {
@@ -2065,86 +1908,6 @@ ${events.length > 0 ? `<div class="page-break"></div>
         this.renderRefereeProfile();
       }
     );
-  },
-
-  // ══════════════════════════════════════════════════════
-  //  SETTINGS / BACKUP
-  // ══════════════════════════════════════════════════════
-  renderSettings() {
-    const versionEl = document.getElementById('settings-version');
-    if (versionEl) versionEl.textContent = APP_VERSION;
-
-    const summary = document.getElementById('settings-summary');
-    if (!summary) return;
-    const matchCount = State.matches.length;
-    const assessed   = State.matches.filter(m => m.assessment).length;
-    summary.innerHTML = `
-      <div class="settings-about-row">
-        <span>Referees</span><span>${State.referees.length}</span>
-      </div>
-      <div class="settings-about-row">
-        <span>Teams</span><span>${State.teams.length}</span>
-      </div>
-      <div class="settings-about-row">
-        <span>Matches recorded</span><span>${matchCount}</span>
-      </div>
-      <div class="settings-about-row">
-        <span>Assessments completed</span><span>${assessed}</span>
-      </div>`;
-  },
-
-  exportData() {
-    const payload = {
-      appVersion: APP_VERSION,
-      exportedAt: new Date().toISOString(),
-      referees:   State.referees,
-      teams:      State.teams,
-      matches:    State.matches,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `referee-coach-backup-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    this.toast('Backup exported');
-  },
-
-  importData(input) {
-    const file = input.files[0];
-    if (!file) return;
-    input.value = '';
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      let data;
-      try { data = JSON.parse(e.target.result); } catch { this.toast('Could not read file'); return; }
-      if (!Array.isArray(data.referees) || !Array.isArray(data.teams) || !Array.isArray(data.matches)) {
-        this.toast('Invalid backup file');
-        return;
-      }
-      const rCount = data.referees.length;
-      const tCount = data.teams.length;
-      const mCount = data.matches.length;
-      this.showModal(
-        'Import Backup?',
-        `This will replace all current data with ${rCount} referee${rCount!==1?'s':''}, ${tCount} team${tCount!==1?'s':''} and ${mCount} match${mCount!==1?'es':''} from the backup. Current data will be lost.`,
-        'Import & Replace',
-        null,
-        () => {
-          State.referees = data.referees;
-          State.teams    = data.teams;
-          State.matches  = data.matches;
-          State.saveReferees();
-          State.saveTeams();
-          State.saveMatches();
-          this.renderSettings();
-          this.renderHome();
-          this.toast(`Restored: ${rCount} referees, ${tCount} teams, ${mCount} matches`);
-        }
-      );
-    };
-    reader.readAsText(file);
   }
 };
 
@@ -2198,40 +1961,6 @@ const PhaseModal = {
     // Set default team selection
     document.getElementById('pm-team-home').classList.add('active');
     document.getElementById('pm-team-away').classList.remove('active');
-
-    // Flip possession row to match scoreboard orientation when teams are swapped
-    const teamRow = document.querySelector('.pm-team-row');
-    if (teamRow) teamRow.style.flexDirection = App._teamsSwapped ? 'row-reverse' : '';
-
-    // Rebuild field position buttons to match current team orientation.
-    // When sides are swapped the physical left/right of the field reverses,
-    // so the button order flips too. The data-pos values (22-home etc.) are
-    // always team-relative and stay correct in stored events and reports.
-    const homeName = match?.homeTeam || 'Home';
-    const awayName = match?.awayTeam || 'Away';
-    const posDefs = App._teamsSwapped
-      ? [
-          { pos: '22-away',   short: '22',   label: `${awayName} 22` },
-          { pos: 'half-away', short: 'Half', label: `${awayName} Half` },
-          { pos: 'half-home', short: 'Half', label: `${homeName} Half` },
-          { pos: '22-home',   short: '22',   label: `${homeName} 22` },
-        ]
-      : [
-          { pos: '22-home',   short: '22',   label: `${homeName} 22` },
-          { pos: 'half-home', short: 'Half', label: `${homeName} Half` },
-          { pos: 'half-away', short: 'Half', label: `${awayName} Half` },
-          { pos: '22-away',   short: '22',   label: `${awayName} 22` },
-        ];
-    const posRow       = document.querySelector('.pm-position-row');
-    const posSubLabels = document.querySelector('.pm-position-sublabels');
-    if (posRow) {
-      posRow.innerHTML = posDefs.map(p =>
-        `<button class="pm-pos-btn" data-pos="${p.pos}" onclick="PhaseModal.setPos(this)">${p.short}</button>`
-      ).join('');
-    }
-    if (posSubLabels) {
-      posSubLabels.innerHTML = posDefs.map(p => `<span>${p.label}</span>`).join('');
-    }
 
     // Render outcomes
     const outDiv = document.getElementById('pm-outcomes');
@@ -2446,42 +2175,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (liveNotes) liveNotes.addEventListener('input', () => App.saveLiveNotes());
 
   if ('serviceWorker' in navigator) {
-    const showUpdateBanner = () =>
-      document.getElementById('update-banner').classList.remove('hidden');
-
-    // updateViaCache:'none' — browser always re-fetches sw.js, bypassing HTTP cache
-    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
-
-      // A new SW is already waiting from a previous visit — show banner now
-      if (reg.waiting) showUpdateBanner();
-
-      // Listen for a new SW installing during this session
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // If a new SW is already waiting on first load, show banner immediately
+      if (reg.waiting) {
+        document.getElementById('update-banner').classList.remove('hidden');
+      }
+      // If a new SW installs while the app is open
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateBanner();
+            document.getElementById('update-banner').classList.remove('hidden');
           }
         });
       });
-
-      // Proactively check for a new SW on every launch
-      reg.update();
-
-      // Fetch version.json from the server (never cached — query string busts it).
-      // If the server version differs from our built-in APP_VERSION, show the
-      // banner immediately rather than waiting for the full SW install cycle.
-      // This is the primary trigger on iOS where the SW lifecycle can be delayed.
-      fetch('version.json?t=' + Date.now())
-        .then(r => r.json())
-        .then(({ version }) => {
-          if (version && version !== APP_VERSION) {
-            showUpdateBanner();
-            reg.update(); // start downloading new SW in background
-          }
-        })
-        .catch(() => {});
-
     }).catch(() => {});
 
     // After SKIP_WAITING, the new SW activates — reload to use it
