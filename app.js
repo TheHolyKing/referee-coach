@@ -1106,8 +1106,10 @@ const App = {
       return;
     }
 
-    const posLabel = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
-    const teamName = (t) => t === 'home' ? (match?.homeTeam || 'Home') : (match?.awayTeam || 'Away');
+    const hn = match?.homeTeam || 'Home';
+    const an = match?.awayTeam || 'Away';
+    const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
+    const teamName = (t) => t === 'home' ? hn : an;
     const isCritical = (e) => e.phase === 'Critical';
     const isPK = (e) => e.outcome === 'PK' || e.phase === 'Pen Gen Play';
 
@@ -1369,8 +1371,10 @@ const App = {
     const events = match.liveData?.events || [];
     const date   = match.date ? new Date(match.date).toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric'}) : 'Unknown date';
 
-    const posLabel = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
-    const teamName = (t) => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
+    const hn = match.homeTeam || 'Home';
+    const an = match.awayTeam || 'Away';
+    const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
+    const teamName = (t) => t === 'home' ? hn : an;
     const ratingBadge = (r) => r ? `<span class="rating-badge ${r}">${r}</span>` : '<span style="color:var(--text2)">Not rated</span>';
 
     // Event summaries by phase
@@ -1495,8 +1499,10 @@ const App = {
       ? new Date(match.date).toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
       : 'Unknown date';
 
-    const teamName  = t => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
-    const posLabel  = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
+    const hn = match.homeTeam || 'Home';
+    const an = match.awayTeam || 'Away';
+    const teamName  = t => t === 'home' ? hn : an;
+    const posLabel  = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
 
     // ── stats ──────────────────────────────────────────────
     const pkAgainst    = { home: 0, away: 0 };
@@ -1570,10 +1576,10 @@ const App = {
     // ── heat map ───────────────────────────────────────────
     const positions = ['22-home','half-home','half-away','22-away'];
     const posLabels = {
-      '22-home':   (match.homeTeam || 'Home') + ' 22',
-      'half-home': (match.homeTeam || 'Home') + ' Half',
-      'half-away': (match.awayTeam || 'Away') + ' Half',
-      '22-away':   (match.awayTeam || 'Away') + ' 22',
+      '22-home':   `${hn} 22`,
+      'half-home': `${hn} Half`,
+      'half-away': `${an} Half`,
+      '22-away':   `${an} 22`,
     };
     const maxPos = Math.max(1, ...Object.values(allPkByPos));
     const heatCells = positions.map(pos => {
@@ -1798,8 +1804,10 @@ ${events.length > 0 ? `<div class="page-break"></div>
     const events = match.liveData?.events || [];
     const date   = match.date ? new Date(match.date).toLocaleDateString('en-AU') : '';
 
-    const posLabel = { 'half-home': 'Home Half', 'half-away': 'Away Half', '22-home': 'Home 22', '22-away': 'Away 22' };
-    const teamName = (t) => t === 'home' ? (match.homeTeam || 'Home') : (match.awayTeam || 'Away');
+    const hn = match.homeTeam || 'Home';
+    const an = match.awayTeam || 'Away';
+    const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
+    const teamName = (t) => t === 'home' ? hn : an;
 
     const pkAgainst = { home: 0, away: 0 };
     events.forEach(e => { if (e.outcome === 'PK' && e.against) pkAgainst[e.against]++; });
@@ -2061,6 +2069,36 @@ const PhaseModal = {
     // Set default team selection
     document.getElementById('pm-team-home').classList.add('active');
     document.getElementById('pm-team-away').classList.remove('active');
+
+    // Rebuild field position buttons to match current team orientation.
+    // When sides are swapped the physical left/right of the field reverses,
+    // so the button order flips too. The data-pos values (22-home etc.) are
+    // always team-relative and stay correct in stored events and reports.
+    const homeName = match?.homeTeam || 'Home';
+    const awayName = match?.awayTeam || 'Away';
+    const posDefs = App._teamsSwapped
+      ? [
+          { pos: '22-away',   short: '22',   label: `${awayName} 22` },
+          { pos: 'half-away', short: 'Half', label: `${awayName} Half` },
+          { pos: 'half-home', short: 'Half', label: `${homeName} Half` },
+          { pos: '22-home',   short: '22',   label: `${homeName} 22` },
+        ]
+      : [
+          { pos: '22-home',   short: '22',   label: `${homeName} 22` },
+          { pos: 'half-home', short: 'Half', label: `${homeName} Half` },
+          { pos: 'half-away', short: 'Half', label: `${awayName} Half` },
+          { pos: '22-away',   short: '22',   label: `${awayName} 22` },
+        ];
+    const posRow       = document.querySelector('.pm-position-row');
+    const posSubLabels = document.querySelector('.pm-position-sublabels');
+    if (posRow) {
+      posRow.innerHTML = posDefs.map(p =>
+        `<button class="pm-pos-btn" data-pos="${p.pos}" onclick="PhaseModal.setPos(this)">${p.short}</button>`
+      ).join('');
+    }
+    if (posSubLabels) {
+      posSubLabels.innerHTML = posDefs.map(p => `<span>${p.label}</span>`).join('');
+    }
 
     // Render outcomes
     const outDiv = document.getElementById('pm-outcomes');
