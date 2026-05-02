@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -466,6 +466,7 @@ const App = {
       const dy = Math.abs(e.touches[0].clientY - startY);
       if (dy > 12 && Math.abs(dx) < dy) { activeItem = null; return; } // scrolling vertically
       if (dx < 0) {
+        activeItem.classList.add('swiping'); // reveal the Delete label
         const clamped = Math.max(dx, -100);
         activeItem.style.transform = `translateX(${clamped}px)`;
         activeItem.style.opacity = String(Math.max(0.4, 1 + clamped / 120));
@@ -478,6 +479,7 @@ const App = {
       const dy = Math.abs(e.changedTouches[0].clientY - startY);
       const el = activeItem;
       activeItem = null;
+      el.classList.remove('swiping');
 
       if (dx < -72 && dy < 40) {
         // Committed — slide off and delete
@@ -487,7 +489,7 @@ const App = {
         const matchId = el.dataset.id;
         setTimeout(() => {
           State.deleteMatch(matchId);
-          this._recentSwipeReady = false; // reset so listener rebinds after re-render
+          this._recentSwipeReady = false;
           this.renderRecentMatches();
           this.toast('Match removed');
         }, 230);

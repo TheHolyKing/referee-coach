@@ -1359,7 +1359,7 @@ html, body {
 }
 .recent-match-item:active { background: var(--surface2); }
 
-/* Red "Delete" label revealed behind the item as it slides left */
+/* Red "Delete" label — hidden until the item is actively being swiped left */
 .recent-swipe-hint {
   position: absolute;
   right: 0; top: 0; bottom: 0;
@@ -1371,7 +1371,9 @@ html, body {
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   pointer-events: none;
   letter-spacing: 0.3px;
+  opacity: 0;
 }
+.recent-match-item.swiping .recent-swipe-hint { opacity: 1; }
 .recent-match-left { flex: 1; min-width: 0; }
 .recent-match-teams { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recent-match-meta  { font-size: 12px; color: var(--text2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
