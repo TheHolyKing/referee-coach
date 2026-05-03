@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.5.3';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -1155,9 +1155,11 @@ const App = {
 
   // ── Score picker ──
   _scoringTeam: null,
+  _scoreCapturedTime: null,
 
   openScorePicker(team) {
-    this._scoringTeam = team;
+    this._scoringTeam       = team;
+    this._scoreCapturedTime = Timer.formatted(); // capture the moment + is tapped
     const match = State.getMatch(this.currentMatchId);
     const teamName = team === 'home' ? (match?.homeTeam || 'Home') : (match?.awayTeam || 'Away');
     document.getElementById('score-picker-title').textContent = teamName + ' Scored';
@@ -1166,7 +1168,8 @@ const App = {
 
   closeScorePicker() {
     document.getElementById('score-picker-overlay').classList.add('hidden');
-    this._scoringTeam = null;
+    this._scoringTeam       = null;
+    this._scoreCapturedTime = null;
   },
 
   applyScore(points, label) {
@@ -1175,11 +1178,12 @@ const App = {
     const match = State.getMatch(this.currentMatchId);
     const teamName = this._scoringTeam === 'home' ? (match?.homeTeam || 'Home') : (match?.awayTeam || 'Away');
     this.logEvent({
-      phase: 'Score',
-      possession: this._scoringTeam,
-      outcome: label || `+${points}`,
-      notes: `${teamName} — ${label || points + ' pts'} (+${points})`,
-      isScore: true,
+      phase:         'Score',
+      possession:    this._scoringTeam,
+      outcome:       label || `+${points}`,
+      notes:         `${teamName} — ${label || points + ' pts'} (+${points})`,
+      isScore:       true,
+      _capturedTime: this._scoreCapturedTime,
     });
     this.closeScorePicker();
   },
@@ -1192,7 +1196,8 @@ const App = {
     const match = State.getMatch(this.currentMatchId);
     if (!match) return;
     if (!match.liveData.events) match.liveData.events = [];
-    event.time = Timer.formatted();
+    event.time = event._capturedTime || Timer.formatted();
+    delete event._capturedTime;
     event.id   = Date.now().toString(36);
     match.liveData.events.push(event);
     State.saveMatches();
@@ -2223,10 +2228,12 @@ const PhaseModal = {
   card:         null,
   flagged:      false,
   scrumResets:  0,    // count of resets logged for the current scrum
+  _capturedTime: null,
 
   open(phase) {
-    this.phase       = phase;
-    this.scrumResets = 0;
+    this._capturedTime = Timer.formatted(); // capture the moment the button is tapped
+    this.phase         = phase;
+    this.scrumResets   = 0;
     this.reset();
 
     const cfg = PHASES[phase];
@@ -2369,7 +2376,7 @@ const PhaseModal = {
 
   logReset(btn) {
     const reason = btn.dataset.val;
-    // Log the reset event immediately
+    // Log the reset event immediately, using time from when the Scrum button was first tapped
     App.logEvent({
       phase:        'Scrum',
       possession:   this.possession,
@@ -2378,6 +2385,7 @@ const PhaseModal = {
       infringement: reason,
       against:      null,
       card:         null,
+      _capturedTime: this._capturedTime,
     });
     this.scrumResets++;
     App.toast(`Scrum reset — ${reason}`);
@@ -2470,15 +2478,16 @@ const PhaseModal = {
       : null;
 
     App.logEvent({
-      phase:        this.phase,
-      possession:   this.phase === 'Critical' ? null : this.possession,
-      position:     this.phase === 'Critical' ? null : this.position,
-      outcome:      this.outcome,
-      infringement: this.infringement,
-      against:      this.phase === 'Critical' ? null : this.against,
-      card:         this.card,
-      flagged:      this.flagged,
+      phase:         this.phase,
+      possession:    this.phase === 'Critical' ? null : this.possession,
+      position:      this.phase === 'Critical' ? null : this.position,
+      outcome:       this.outcome,
+      infringement:  this.infringement,
+      against:       this.phase === 'Critical' ? null : this.against,
+      card:          this.card,
+      flagged:       this.flagged,
       notes,
+      _capturedTime: this._capturedTime,
     });
     const cardMsg = this.card ? ` + ${this.card === 'yellow' ? '🟡 Yellow' : this.card === 'blue' ? '🟦 Blue' : '🔴 Red'} card` : '';
     const flagMsg = this.flagged ? ' · 🚩 Flagged' : '';
