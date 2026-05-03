@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.4';
+const APP_VERSION = '1.5.5';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -213,8 +213,11 @@ const Timer = {
   start() {
     if (this.running) return;
     // Advance phase on first start and after half time
-    if (this.matchPhase === 'pregame')  this.matchPhase = 'first';
-    if (this.matchPhase === 'halftime') this.matchPhase = 'second';
+    if (this.matchPhase === 'pregame') this.matchPhase = 'first';
+    if (this.matchPhase === 'halftime') {
+      this.matchPhase = 'second';
+      this.elapsed    = 0; // reset so 2nd half counts from 00:00, not continuing from break
+    }
     this.running = true;
     this._startedAt = Date.now() - this.elapsed * 1000;
     this._interval = setInterval(() => {
