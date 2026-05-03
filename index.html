@@ -604,6 +604,24 @@
       </div>
     </div>
 
+    <!-- ═══════════════════ MODAL: PK FOLLOW-UP ═══════════════════ -->
+    <div id="pk-followup-overlay" class="score-picker-overlay hidden">
+      <div class="score-picker">
+        <div class="score-picker-title">Penalty Kick Awarded</div>
+        <div class="score-picker-sub" id="pk-followup-sub">How was the penalty taken?</div>
+        <button class="score-picker-cancel" onclick="App.closePKFollowup()">Dismiss</button>
+        <button class="score-picker-opt pk-followup-opt" onclick="App.takePKAs('Lineout')">
+          Kick to Touch — Lineout <span>Log the lineout</span>
+        </button>
+        <button class="score-picker-opt pk-followup-opt" onclick="App.takePKAs('Scrum')">
+          Take a Scrum <span>Log the scrum</span>
+        </button>
+        <button class="score-picker-opt pk-followup-opt" onclick="App.takePKAs('QuickTap')">
+          Quick Tap <span>Play on</span>
+        </button>
+      </div>
+    </div>
+
     <!-- ═══════════════════ MODAL: CONFIRM ═══════════════════ -->
     <div id="modal-overlay" class="modal-overlay hidden" onclick="App.closeModal()">
       <div class="modal" onclick="event.stopPropagation()">

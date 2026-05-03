@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.3';
+const APP_VERSION = '1.5.4';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -2066,6 +2066,49 @@ ${events.length > 0 ? `<div class="page-break"></div>
       .catch(() => this.toast('Could not check — are you online?', 2500));
   },
 
+  // ══════════════════════════════════════════════════════
+  //  PK FOLLOW-UP FLOW
+  // ══════════════════════════════════════════════════════
+  _pkAgainst: null,
+
+  showPKFollowup(againstTeam) {
+    this._pkAgainst = againstTeam;
+    const match = State.getMatch(this.currentMatchId);
+    const sub = document.getElementById('pk-followup-sub');
+    if (sub && match) {
+      const receiving = againstTeam === 'home' ? match.awayTeam : againstTeam === 'away' ? match.homeTeam : null;
+      sub.textContent = receiving
+        ? `${receiving} awarded the penalty — how was it taken?`
+        : 'How was the penalty taken?';
+    }
+    document.getElementById('pk-followup-overlay').classList.remove('hidden');
+  },
+
+  closePKFollowup() {
+    document.getElementById('pk-followup-overlay').classList.add('hidden');
+    this._pkAgainst = null;
+  },
+
+  takePKAs(type) {
+    const againstTeam = this._pkAgainst;
+    this.closePKFollowup();
+
+    if (type === 'QuickTap') {
+      this.toast('Quick Tap — play on');
+      return;
+    }
+
+    // Open Lineout or Scrum modal; time is captured fresh at this moment
+    // since the penalty kick itself just occurred
+    App.openPhase(type);
+
+    // Pre-set possession to the team that received the penalty
+    if (againstTeam) {
+      const receivingTeam = againstTeam === 'home' ? 'away' : 'home';
+      PhaseModal.setTeam(receivingTeam);
+    }
+  },
+
   shareReport() {
     if (navigator.share) {
       const match = State.getMatch(this.currentMatchId);
@@ -2493,6 +2536,11 @@ const PhaseModal = {
     const flagMsg = this.flagged ? ' · 🚩 Flagged' : '';
     App.toast(`${this.phase} logged${cardMsg}${flagMsg}`);
     document.getElementById('phase-modal-overlay').classList.add('hidden');
+
+    // If a PK was awarded, ask the coach how it was taken next
+    if (this.outcome === 'PK') {
+      App.showPKFollowup(this.against);
+    }
   }
 };
 
