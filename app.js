@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.7';
+const APP_VERSION = '1.5.8';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -209,6 +209,7 @@ const Timer = {
   matchPhase: 'pregame', // pregame | first | halftime | second | fulltime
   _interval: null,
   _startedAt: null,
+  _suspended: false, // true when page is not visible — skip DOM updates
 
   start() {
     if (this.running) return;
@@ -216,14 +217,15 @@ const Timer = {
     if (this.matchPhase === 'pregame') this.matchPhase = 'first';
     if (this.matchPhase === 'halftime') {
       this.matchPhase = 'second';
-      this.elapsed    = 0; // reset so 2nd half counts from 00:00, not continuing from break
+      this.elapsed    = 0; // reset so 2nd half counts from 00:00
     }
     this.running = true;
     this._startedAt = Date.now() - this.elapsed * 1000;
+    // 1000ms is enough — display is MM:SS precision only
     this._interval = setInterval(() => {
       this.elapsed = Math.floor((Date.now() - this._startedAt) / 1000);
-      Timer.render();
-    }, 500);
+      if (!Timer._suspended) Timer.render();
+    }, 1000);
     this.renderControls();
   },
 
@@ -335,6 +337,20 @@ const App = {
   currentMatch:     null,
   editingRefereeId: null,
   editingTeamId:    null,
+  _wakeLock:        null,
+
+  // ── Screen Wake Lock ────────────────────────────────────
+  async _requestWakeLock() {
+    if (!('wakeLock' in navigator) || this._wakeLock) return;
+    try { this._wakeLock = await navigator.wakeLock.request('screen'); }
+    catch(_) {}
+  },
+
+  _releaseWakeLock() {
+    if (!this._wakeLock) return;
+    this._wakeLock.release().catch(() => {});
+    this._wakeLock = null;
+  },
 
   // ── Navigation helpers ──────────────────────────────────
   nav(screen) {
@@ -345,7 +361,7 @@ const App = {
   back() {
     const leaving = Router.current();
     Router.pop();
-    if (leaving === 'live-match')  Timer.pause();
+    if (leaving === 'live-match') { Timer.pause(); this._releaseWakeLock(); }
     if (leaving === 'new-referee') this.editingRefereeId = null;
     if (leaving === 'new-team')    this.editingTeamId = null;
     this.onScreenEnter(Router.current());
@@ -1094,6 +1110,7 @@ const App = {
     Timer.reset();
     this.nav('live-match');
     this.renderLiveMatch();
+    this._requestWakeLock();
   },
 
   // ══════════════════════════════════════════════════════
@@ -1359,6 +1376,7 @@ const App = {
       null,
       () => {
         Timer.pause();
+        this._releaseWakeLock();
         Router.pop();
         this.onScreenEnter(Router.current());
       }
@@ -1368,6 +1386,7 @@ const App = {
   goToAssessment() {
     this.saveLiveNotes();
     Timer.pause();
+    this._releaseWakeLock();
     this.nav('assessment');
     this.renderAssessment();
   },
@@ -2610,4 +2629,18 @@ document.addEventListener('DOMContentLoaded', () => {
       window.location.reload();
     });
   }
+
+  // Page Visibility — skip timer DOM updates when the screen is off or app
+  // is backgrounded. The elapsed counter keeps running via wall-clock maths
+  // so it stays accurate. Re-render once when the coach returns.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      Timer._suspended = true;
+    } else {
+      Timer._suspended = false;
+      if (Timer.running) Timer.render(); // sync display immediately on return
+      // Re-acquire wake lock if it was released by the OS while backgrounded
+      if (Router.current() === 'live-match') App._requestWakeLock();
+    }
+  });
 });
