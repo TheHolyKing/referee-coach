@@ -1,4 +1,4 @@
-const VERSION = '1.5.5';
+const VERSION = '1.5.6';
 const CACHE   = 'refcoach-' + VERSION;
 const ASSETS  = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 

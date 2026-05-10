@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.5';
+const APP_VERSION = '1.5.6';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -117,7 +117,7 @@ const PHASES = {
   },
   'Tackle': {
     outcomes: ['Good','Slow','Played Away','PK','Unplayable'],
-    infringements: ['High Tackle','Croc Roll','No Arms','Tackler Release','Holding On','Not Rolling','Off Feet','Double Movement','Offside','Other']
+    infringements: ['High Tackle','No Arms','Tackler Release','Holding On','Not Rolling','Off Feet','Offside','Other']
   },
   'Ruck': {
     outcomes: ['Good','Slow','Turnover','Unplayable','Advantage','PK','Missed'],
