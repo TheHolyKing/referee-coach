@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.6';
+const APP_VERSION = '1.5.7';
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -129,7 +129,7 @@ const PHASES = {
   },
   'Pen Gen Play': {
     outcomes: ['PK','FK','Advantage'],
-    infringements: ['Offside','High Tackle','Obstruction','Foul Play','Not Releasing','Hands in Ruck','Time Wasting','Other']
+    infringements: ['Offside','High Tackle','Tackle in the Air','Deliberate Knock-On','Obstruction','Foul Play','Not Releasing','Hands in Ruck','Time Wasting','Other']
   },
   'Free Kick': {
     outcomes: ['FK'],
