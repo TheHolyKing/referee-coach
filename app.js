@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.10';
+const APP_VERSION = '1.5.11';
 
 // ══════════════════════════════════════════════════════════
 //  UTILS
@@ -2113,29 +2113,41 @@ ${events.length > 0 ? `<div class="page-break"></div>
     window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
   },
 
-  applyUpdate() {
-    navigator.serviceWorker.getRegistration().then(reg => {
-      if (reg?.waiting) {
-        // New SW is ready — activate it; controllerchange will trigger reload
-        reg.waiting.postMessage('SKIP_WAITING');
-      } else if (reg) {
-        // SW still installing — poll briefly then reload regardless
-        reg.update();
-        let attempts = 0;
-        const poll = setInterval(() => {
-          attempts++;
-          if (reg.waiting) {
-            clearInterval(poll);
-            reg.waiting.postMessage('SKIP_WAITING');
-          } else if (attempts >= 6) {
-            clearInterval(poll);
-            window.location.reload();
-          }
-        }, 500);
-      } else {
-        window.location.reload();
-      }
-    }).catch(() => window.location.reload());
+  async applyUpdate() {
+    let reg;
+    try { reg = await navigator.serviceWorker.getRegistration(); }
+    catch (_) { this.toast('Update check failed — try again shortly.', 3000); return; }
+
+    if (!reg) { window.location.reload(); return; }
+
+    // New SW already fully installed and waiting — activate it now.
+    // The 'controllerchange' listener (registered at startup) reloads
+    // the page once it takes over.
+    if (reg.waiting) { reg.waiting.postMessage('SKIP_WAITING'); return; }
+
+    // Nothing waiting yet — force a fresh check and, if a worker is (or
+    // starts) installing, wait for its 'installed' state instead of a
+    // fixed timeout. Never fall back to a plain reload here: the old
+    // worker is still in control, so a reload would just re-serve the
+    // still-cached old app.js/styles.css while looking like it updated.
+    try { await reg.update(); } catch (_) {}
+    if (reg.waiting) { reg.waiting.postMessage('SKIP_WAITING'); return; }
+
+    const installing = reg.installing;
+    if (installing) {
+      this.toast('Updating…', 2500);
+      installing.addEventListener('statechange', function onChange() {
+        if (this.state === 'installed' && reg.waiting) {
+          this.removeEventListener('statechange', onChange);
+          reg.waiting.postMessage('SKIP_WAITING');
+        } else if (this.state === 'redundant') {
+          this.removeEventListener('statechange', onChange);
+        }
+      });
+      return;
+    }
+
+    this.toast('No update ready yet — try again in a few seconds.', 3000);
   },
 
   checkForUpdates() {
