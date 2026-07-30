@@ -1,6 +1,43 @@
 'use strict';
 
-const APP_VERSION = '1.5.8';
+const APP_VERSION = '1.5.9';
+
+// ══════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════
+
+// Escapes user-supplied text before it's interpolated into innerHTML.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+// Guards against non-hex colour values reaching a style="" attribute
+// (e.g. a hand-edited or corrupted backup-import file).
+function safeColour(hex, fallback) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(hex || '') ? hex : fallback;
+}
+
+// Lazy-loads the SheetJS library only when an .xlsx/.xls import is actually
+// attempted, rather than blocking every page load on a third-party CDN
+// script that most sessions never use. Pinned with SRI so a compromised
+// CDN response can't silently execute in the app's context.
+let _xlsxLoadPromise = null;
+function loadXLSX() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve();
+  if (_xlsxLoadPromise) return _xlsxLoadPromise;
+  _xlsxLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    script.integrity = 'sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT';
+    script.crossOrigin = 'anonymous';
+    script.onload  = () => resolve();
+    script.onerror = () => { _xlsxLoadPromise = null; reject(new Error('Failed to load XLSX library')); };
+    document.head.appendChild(script);
+  });
+  return _xlsxLoadPromise;
+}
 
 // ══════════════════════════════════════════════════════════
 //  DATA LAYER
@@ -169,6 +206,15 @@ const Router = {
 
   current() { return this.stack[this.stack.length - 1]; },
 
+  // Off-screen screens are only moved out of view with a CSS transform, so
+  // without this they'd stay reachable by keyboard focus and screen readers.
+  _syncInert() {
+    const activeId = 'screen-' + this.current();
+    document.querySelectorAll('.screen').forEach(s => {
+      s.toggleAttribute('inert', s.id !== activeId);
+    });
+  },
+
   push(screenId) {
     if (this.current() === screenId) return; // already here — ignore
     const prev = document.getElementById('screen-' + this.current());
@@ -179,6 +225,7 @@ const Router = {
       next.offsetHeight; // force reflow before adding active
       next.classList.add('active');
     }
+    this._syncInert();
   },
 
   pop() {
@@ -188,6 +235,7 @@ const Router = {
     this.stack.pop();
     const prev = document.getElementById('screen-' + this.current());
     if (prev) prev.classList.remove('slide-left');
+    this._syncInert();
   },
 
   replace(screenId) {
@@ -196,6 +244,7 @@ const Router = {
     this.stack[this.stack.length - 1] = screenId;
     const next = document.getElementById('screen-' + screenId);
     if (next) next.classList.add('active');
+    this._syncInert();
   }
 };
 
@@ -377,6 +426,7 @@ const App = {
         this.renderTeams();
         break;
       case 'new-team':        this.prefillTeamForm(); break;
+      case 'new-referee':     this.prefillRefereeForm(); break;
       case 'new-match-select':
         const si = document.getElementById('select-referee-search');
         if (si) si.value = '';
@@ -440,20 +490,23 @@ const App = {
 
     list.innerHTML = recent.map(m => {
       const ref  = State.getReferee(m.refereeId);
-      const refName = ref ? ref.firstName + ' ' + ref.lastName : 'Unknown';
+      const refName = escapeHtml(ref ? ref.firstName + ' ' + ref.lastName : 'Unknown');
       const d    = m.date ? new Date(m.date) : null;
       const dateStr = d ? d.toLocaleDateString('en-AU', { day:'numeric', month:'short' }) : '–';
       const hs   = m.assessment?.homeScore ?? m.liveData?.homeScore ?? 0;
       const as_  = m.assessment?.awayScore ?? m.liveData?.awayScore ?? 0;
       const rating = m.assessment?.ratings?.overall || 'none';
+      const homeTeam = escapeHtml(m.homeTeam || 'TBC');
+      const awayTeam = escapeHtml(m.awayTeam || 'TBC');
+      const competition = escapeHtml(m.competition || '');
       return `<div class="recent-match-item" data-id="${m.id}" onclick="App.openMatch('${m.id}')">
         <div class="recent-match-left">
-          <div class="recent-match-teams">${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'}</div>
-          <div class="recent-match-meta">${refName}${m.competition ? ' · ' + m.competition : ''} · ${dateStr}</div>
+          <div class="recent-match-teams">${homeTeam} v ${awayTeam}</div>
+          <div class="recent-match-meta">${refName}${competition ? ' · ' + competition : ''} · ${dateStr}</div>
         </div>
         <div class="recent-match-right">
           <div class="recent-match-score">${hs} – ${as_}</div>
-          <div class="match-rating-dot ${rating}"></div>
+          <div class="match-rating-dot ${rating}" title="${rating === 'none' ? 'Not rated' : rating}"></div>
         </div>
         <div class="recent-swipe-hint">Delete</div>
       </div>`;
@@ -541,12 +594,12 @@ const App = {
 
     list.innerHTML = refs.map(r => {
       const matches = State.matchesForReferee(r.id);
-      const initials = ((r.firstName||'?')[0] + (r.lastName||'?')[0]).toUpperCase();
+      const initials = escapeHtml(((r.firstName||'?')[0] + (r.lastName||'?')[0]).toUpperCase());
       return `<div class="list-item" onclick="App.openReferee('${r.id}')">
         <div class="list-avatar">${initials}</div>
         <div class="list-item-body">
-          <div class="list-item-title">${r.firstName} ${r.lastName}</div>
-          <div class="list-item-sub">${r.union || ''} · ${matches.length} match${matches.length !== 1 ? 'es' : ''}</div>
+          <div class="list-item-title">${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)}</div>
+          <div class="list-item-sub">${escapeHtml(r.union || '')} · ${matches.length} match${matches.length !== 1 ? 'es' : ''}</div>
         </div>
         <div class="list-chevron">›</div>
       </div>`;
@@ -572,18 +625,21 @@ const App = {
       return;
     }
     if (teams.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>No teams match "${filter}".</p></div>`;
+      list.innerHTML = `<div class="empty-state"><p>No teams match "${escapeHtml(filter)}".</p></div>`;
       return;
     }
-    list.innerHTML = teams.map(t => `
+    list.innerHTML = teams.map(t => {
+      const c = safeColour(t.colour, '#888');
+      return `
       <div class="list-item" onclick="App.openTeam('${t.id}')">
-        <div class="team-list-dot" style="background:${t.colour || '#888'};border-color:${t.colour || '#888'}"></div>
+        <div class="team-list-dot" style="background:${c};border-color:${c}"></div>
         <div class="list-item-body">
-          <div class="list-item-title">${t.name}</div>
-          <div class="list-item-sub">${t.homeground ? '&#x1F3DF; ' + t.homeground : '<span style="color:var(--text2)">' + (t.colour || 'No colour') + '</span>'}</div>
+          <div class="list-item-title">${escapeHtml(t.name)}</div>
+          <div class="list-item-sub">${t.homeground ? '&#x1F3DF; ' + escapeHtml(t.homeground) : '<span style="color:var(--text2)">' + escapeHtml(t.colour || 'No colour') + '</span>'}</div>
         </div>
         <div class="list-chevron">›</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   },
 
   filterTeams(val) { this.renderTeams(val); },
@@ -711,8 +767,11 @@ const App = {
 
     if (team?.homeground) {
       suggestion.classList.remove('hidden');
-      suggestion.innerHTML = `&#x1F3DF; <strong>${team.homeground}</strong> &nbsp;
-        <button class="venue-use-btn" onclick="App.useHomeGround('${team.homeground.replace(/'/g,"\\'")}')">Use this ground</button>`;
+      // JS-escape first (for the single-quoted string literal in onclick),
+      // then HTML-escape the result (for the double-quoted attribute itself).
+      const jsEscaped = team.homeground.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      suggestion.innerHTML = `&#x1F3DF; <strong>${escapeHtml(team.homeground)}</strong> &nbsp;
+        <button class="venue-use-btn" onclick="App.useHomeGround('${escapeHtml(jsEscaped)}')">Use this ground</button>`;
     } else {
       suggestion.classList.add('hidden');
       suggestion.innerHTML = '';
@@ -739,17 +798,15 @@ const App = {
       reader.onload = (e) => this._processImportRows(this._parseCSV(e.target.result));
       reader.readAsText(file);
     } else if (ext === 'xlsx' || ext === 'xls') {
-      if (typeof XLSX === 'undefined') {
-        this.toast('XLSX support requires an internet connection on first load.', 3000);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-        this._processImportRows(rows);
-      };
-      reader.readAsArrayBuffer(file);
+      loadXLSX().then(() => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+          this._processImportRows(rows);
+        };
+        reader.readAsArrayBuffer(file);
+      }).catch(() => this.toast('Could not load XLSX support — check your connection.', 3000));
     } else {
       this.toast('Please select a .csv or .xlsx file.');
     }
@@ -835,14 +892,15 @@ const App = {
       reader.onload = (e) => this._processTeamImportRows(this._parseCSV(e.target.result));
       reader.readAsText(file);
     } else if (ext === 'xlsx' || ext === 'xls') {
-      if (typeof XLSX === 'undefined') { this.toast('XLSX requires an internet connection on first load.', 3000); return; }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-        this._processTeamImportRows(rows);
-      };
-      reader.readAsArrayBuffer(file);
+      loadXLSX().then(() => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+          this._processTeamImportRows(rows);
+        };
+        reader.readAsArrayBuffer(file);
+      }).catch(() => this.toast('Could not load XLSX support — check your connection.', 3000));
     } else {
       this.toast('Please select a .csv or .xlsx file.');
     }
@@ -906,7 +964,7 @@ const App = {
       this.editingRefereeId = null;
       this.toast('Referee updated');
       Router.pop();
-      this.openReferee(data.id || this.currentRefereeId);
+      this.openReferee(this.currentRefereeId);
     } else {
       const ref = State.addReferee(data);
       this.toast('Referee added');
@@ -920,14 +978,23 @@ const App = {
     const ref = State.getReferee(this.currentRefereeId);
     if (!ref) return;
     this.editingRefereeId = ref.id;
-    document.getElementById('ref-firstname').value = ref.firstName || '';
-    document.getElementById('ref-lastname').value  = ref.lastName  || '';
-    const gradeEl = document.getElementById('ref-grade');
-    if (gradeEl) gradeEl.value = ref.grade || '';
-    document.getElementById('ref-union').value     = ref.union     || '';
-    document.getElementById('ref-email').value     = ref.email     || '';
     this.nav('new-referee');
-    document.querySelector('#screen-new-referee .topbar h1').textContent = 'Edit Referee';
+  },
+
+  // Resets/prefills the New Referee form on every entry to the screen —
+  // mirrors prefillTeamForm() so stale data from a previous edit can't
+  // leak into a fresh "add referee" flow.
+  prefillRefereeForm() {
+    const titleEl = document.querySelector('#screen-new-referee .topbar h1');
+    const ref = this.editingRefereeId ? State.getReferee(this.editingRefereeId) : null;
+
+    document.getElementById('ref-firstname').value = ref?.firstName || '';
+    document.getElementById('ref-lastname').value  = ref?.lastName  || '';
+    const gradeEl = document.getElementById('ref-grade');
+    if (gradeEl) gradeEl.value = ref?.grade || '';
+    document.getElementById('ref-union').value = ref?.union || '';
+    document.getElementById('ref-email').value = ref?.email || '';
+    if (titleEl) titleEl.textContent = ref ? 'Edit Referee' : 'New Referee';
   },
 
   openReferee(id) {
@@ -953,11 +1020,11 @@ const App = {
         <div class="profile-stat"><div class="profile-stat-val">${ratingCounts.Poor}</div><div class="profile-stat-label">Poor</div></div>
       </div>
       <div class="profile-info-row">
-        ${ref.grade ? `<span class="profile-chip">${ref.grade}</span>` : ''}
-        ${ref.union ? `<span class="profile-chip">${ref.union}</span>` : ''}
-        ${ref.email ? `<span class="profile-chip">${ref.email}</span>` : ''}
+        ${ref.grade ? `<span class="profile-chip">${escapeHtml(ref.grade)}</span>` : ''}
+        ${ref.union ? `<span class="profile-chip">${escapeHtml(ref.union)}</span>` : ''}
+        ${ref.email ? `<span class="profile-chip">${escapeHtml(ref.email)}</span>` : ''}
       </div>
-      ${ref.notes ? `<div style="margin-top:10px;font-size:13px;color:var(--text2);">${ref.notes}</div>` : ''}
+      ${ref.notes ? `<div style="margin-top:10px;font-size:13px;color:var(--text2);">${escapeHtml(ref.notes)}</div>` : ''}
     `;
 
     const hist = document.getElementById('referee-match-history');
@@ -973,19 +1040,22 @@ const App = {
       const rating = m.assessment?.ratings?.overall || 'none';
       const hs = m.assessment?.homeScore ?? m.liveData?.homeScore ?? 0;
       const as_ = m.assessment?.awayScore ?? m.liveData?.awayScore ?? 0;
+      const homeTeam = escapeHtml(m.homeTeam || 'TBC');
+      const awayTeam = escapeHtml(m.awayTeam || 'TBC');
+      const competition = escapeHtml(m.competition || '');
       return `<div class="match-item">
         <div class="match-date-badge" onclick="App.openMatch('${m.id}')">
           <div class="match-date-day">${dayStr}</div>
           <div class="match-date-mon">${monStr}</div>
         </div>
         <div class="match-item-body" onclick="App.openMatch('${m.id}')">
-          <div class="match-item-teams">${m.homeTeam || 'TBC'} v ${m.awayTeam || 'TBC'}</div>
+          <div class="match-item-teams">${homeTeam} v ${awayTeam}</div>
           <div class="match-item-sub">
             <span class="match-item-score">${hs} – ${as_}</span>
-            ${m.competition ? ' · ' + m.competition : ''}
+            ${competition ? ' · ' + competition : ''}
           </div>
         </div>
-        <div class="match-rating-dot ${rating}" onclick="App.openMatch('${m.id}')"></div>
+        <div class="match-rating-dot ${rating}" title="${rating === 'none' ? 'Not rated' : rating}" onclick="App.openMatch('${m.id}')"></div>
         <button class="btn-icon btn-icon-danger match-del-btn" onclick="App.confirmDeleteMatchFromProfile('${m.id}')" aria-label="Delete match">
           <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
@@ -1014,17 +1084,17 @@ const App = {
     }
 
     if (refs.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>No referees match "${filter}".</p></div>`;
+      list.innerHTML = `<div class="empty-state"><p>No referees match "${escapeHtml(filter)}".</p></div>`;
       return;
     }
 
     list.innerHTML = refs.map(r => {
-      const initials = ((r.firstName||'?')[0] + (r.lastName||'?')[0]).toUpperCase();
+      const initials = escapeHtml(((r.firstName||'?')[0] + (r.lastName||'?')[0]).toUpperCase());
       return `<div class="list-item" onclick="App.selectRefereeForMatch('${r.id}')">
         <div class="list-avatar">${initials}</div>
         <div class="list-item-body">
-          <div class="list-item-title">${r.firstName} ${r.lastName}</div>
-          <div class="list-item-sub">${r.union||''}</div>
+          <div class="list-item-title">${escapeHtml(r.firstName)} ${escapeHtml(r.lastName)}</div>
+          <div class="list-item-sub">${escapeHtml(r.union||'')}</div>
         </div>
         <div class="list-chevron">›</div>
       </div>`;
@@ -1061,7 +1131,7 @@ const App = {
       const dot = document.getElementById('match-' + side + '-dot');
       if (!sel) return;
       sel.innerHTML = '<option value="">Select a saved team…</option>' +
-        teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+        teams.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
       sel.value = '';
       if (dot) { dot.style.background = 'transparent'; dot.style.borderColor = 'var(--border)'; }
     });
@@ -1131,8 +1201,8 @@ const App = {
     if (!el) return;
     if (!this._teamsSwapped) { el.classList.add('hidden'); return; }
     const m = this.currentMatch;
-    const hn = m?.homeTeam || 'Home';
-    const an = m?.awayTeam || 'Away';
+    const hn = escapeHtml(m?.homeTeam || 'Home');
+    const an = escapeHtml(m?.awayTeam || 'Away');
     el.classList.remove('hidden');
     el.innerHTML = `<span class="swap-ind-team">${an}</span><span class="swap-ind-arrow">↔</span><span class="swap-ind-team">${hn}</span>`;
   },
@@ -1258,8 +1328,8 @@ const App = {
       return;
     }
 
-    const hn = match?.homeTeam || 'Home';
-    const an = match?.awayTeam || 'Away';
+    const hn = escapeHtml(match?.homeTeam || 'Home');
+    const an = escapeHtml(match?.awayTeam || 'Away');
     const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
     const teamName = (t) => t === 'home' ? hn : an;
     const isCritical = (e) => e.phase === 'Critical';
@@ -1278,19 +1348,20 @@ const App = {
 
       // Score event
       if (e.isScore) {
-        const scoreColour = e.possession === 'home'
-          ? (match?.homeColour || 'var(--accent)')
-          : (match?.awayColour || 'var(--accent2)');
+        const scoreColour = safeColour(
+          e.possession === 'home' ? match?.homeColour : match?.awayColour,
+          e.possession === 'home' ? 'var(--accent)' : 'var(--accent2)'
+        );
         return `<div class="event-marker marker-score" style="border-left:4px solid ${scoreColour};" onclick="App.selectEvent(this)">
           <span class="event-marker-time">${e.time}</span>
-          <span class="event-marker-label" style="color:${scoreColour};">&#9679; ${e.notes}</span>
+          <span class="event-marker-label" style="color:${scoreColour};">&#9679; ${escapeHtml(e.notes)}</span>
           <button class="event-del" onclick="event.stopPropagation();App.deleteEvent('${e.id}')">×</button>
         </div>`;
       }
 
       const badgeClass = isCritical(e) ? 'critical' : isPK(e) ? 'penalty' : '';
       const parts = isCritical(e)
-        ? (e.notes || '<em style="color:var(--text2)">No text</em>')
+        ? (e.notes ? escapeHtml(e.notes) : '<em style="color:var(--text2)">No text</em>')
         : [
             e.possession ? teamName(e.possession) : null,
             e.position   ? posLabel[e.position]   : null,
@@ -1404,9 +1475,9 @@ const App = {
     const ref  = State.getReferee(match.refereeId);
     const date = match.date ? new Date(match.date).toLocaleDateString('en-AU', { day:'numeric', month:'long', year:'numeric'}) : '';
     document.getElementById('assessment-match-summary').innerHTML =
-      `<strong>${ref ? ref.firstName + ' ' + ref.lastName : 'Unknown Referee'}</strong><br>
-       ${match.homeTeam} v ${match.awayTeam}<br>
-       ${[match.competition, match.venue, date].filter(Boolean).join(' · ')}`;
+      `<strong>${escapeHtml(ref ? ref.firstName + ' ' + ref.lastName : 'Unknown Referee')}</strong><br>
+       ${escapeHtml(match.homeTeam)} v ${escapeHtml(match.awayTeam)}<br>
+       ${[match.competition, match.venue, date].filter(Boolean).map(escapeHtml).join(' · ')}`;
 
     document.getElementById('final-home-label').textContent = match.homeTeam;
     document.getElementById('final-away-label').textContent = match.awayTeam;
@@ -1449,7 +1520,7 @@ const App = {
         </div>
         <div class="rating-notes">
           <textarea placeholder="Notes for this area…" rows="2"
-            data-area="${area.id}">${(a.areaNotes || {})[area.id] || ''}</textarea>
+            data-area="${area.id}">${escapeHtml((a.areaNotes || {})[area.id] || '')}</textarea>
         </div>
       </div>
     `).join('');
@@ -1541,19 +1612,19 @@ const App = {
       const as_ = a.awayScore ?? match.liveData?.awayScore ?? 0;
       const overall = a.ratings?.overall || '';
       scoreBanner.innerHTML = `
-        <span class="rpt-banner-team">${match.homeTeam || 'Home'}</span>
+        <span class="rpt-banner-team">${escapeHtml(match.homeTeam || 'Home')}</span>
         <span class="rpt-banner-score">${hs} – ${as_}</span>
-        <span class="rpt-banner-team">${match.awayTeam || 'Away'}</span>
-        ${overall ? `<span class="rpt-banner-rating rating-badge ${overall}">${overall}</span>` : ''}`;
+        <span class="rpt-banner-team">${escapeHtml(match.awayTeam || 'Away')}</span>
+        ${overall ? `<span class="rpt-banner-rating rating-badge ${overall}">${escapeHtml(overall)}</span>` : ''}`;
     }
     const events = match.liveData?.events || [];
     const date   = match.date ? new Date(match.date).toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric'}) : 'Unknown date';
 
-    const hn = match.homeTeam || 'Home';
-    const an = match.awayTeam || 'Away';
+    const hn = escapeHtml(match.homeTeam || 'Home');
+    const an = escapeHtml(match.awayTeam || 'Away');
     const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
     const teamName = (t) => t === 'home' ? hn : an;
-    const ratingBadge = (r) => r ? `<span class="rating-badge ${r}">${r}</span>` : '<span style="color:var(--text2)">Not rated</span>';
+    const ratingBadge = (r) => r ? `<span class="rating-badge ${r}">${escapeHtml(r)}</span>` : '<span style="color:var(--text2)">Not rated</span>';
 
     // Event summaries by phase
     const phaseCounts = {};
@@ -1574,7 +1645,7 @@ const App = {
         </div>`;
       }
       const parts = e.phase === 'Critical'
-        ? (e.notes || '')
+        ? escapeHtml(e.notes || '')
         : [
             e.possession ? teamName(e.possession) : null,
             e.position   ? posLabel[e.position]   : null,
@@ -1595,7 +1666,7 @@ const App = {
         e.outcome    || null,
         e.infringement || null,
         e.against    ? `→ against ${teamName(e.against)}` : null,
-        e.notes      || null,
+        e.notes      ? escapeHtml(e.notes) : null,
       ].filter(Boolean).join(' · ');
       return `<div class="report-row report-row-flagged">
         <span class="report-row-label">🚩 ${e.time} <strong>${e.phase}</strong></span>
@@ -1612,15 +1683,15 @@ const App = {
       </div>` : ''}
       <div class="report-section">
         <div class="report-section-title">Match Information</div>
-        <div class="report-row"><span class="report-row-label">Referee</span><span class="report-row-val">${ref ? ref.firstName + ' ' + ref.lastName : '–'}</span></div>
-        <div class="report-row"><span class="report-row-label">Grade</span><span class="report-row-val">${ref?.grade || '–'}</span></div>
+        <div class="report-row"><span class="report-row-label">Referee</span><span class="report-row-val">${escapeHtml(ref ? ref.firstName + ' ' + ref.lastName : '–')}</span></div>
+        <div class="report-row"><span class="report-row-label">Grade</span><span class="report-row-val">${escapeHtml(ref?.grade || '–')}</span></div>
         <div class="report-row"><span class="report-row-label">Date</span><span class="report-row-val">${date}</span></div>
-        <div class="report-row"><span class="report-row-label">Competition</span><span class="report-row-val">${match.competition || '–'}</span></div>
-        <div class="report-row"><span class="report-row-label">Venue</span><span class="report-row-val">${match.venue || '–'}</span></div>
-        <div class="report-row"><span class="report-row-label">Result</span><span class="report-row-val">${match.homeTeam} ${a.homeScore ?? match.liveData?.homeScore ?? 0} – ${a.awayScore ?? match.liveData?.awayScore ?? 0} ${match.awayTeam}</span></div>
-        ${match.ar1 ? `<div class="report-row"><span class="report-row-label">AR1</span><span class="report-row-val">${match.ar1}</span></div>` : ''}
-        ${match.ar2 ? `<div class="report-row"><span class="report-row-label">AR2</span><span class="report-row-val">${match.ar2}</span></div>` : ''}
-        ${match.tmo ? `<div class="report-row"><span class="report-row-label">TMO</span><span class="report-row-val">${match.tmo}</span></div>` : ''}
+        <div class="report-row"><span class="report-row-label">Competition</span><span class="report-row-val">${escapeHtml(match.competition || '–')}</span></div>
+        <div class="report-row"><span class="report-row-label">Venue</span><span class="report-row-val">${escapeHtml(match.venue || '–')}</span></div>
+        <div class="report-row"><span class="report-row-label">Result</span><span class="report-row-val">${hn} ${a.homeScore ?? match.liveData?.homeScore ?? 0} – ${a.awayScore ?? match.liveData?.awayScore ?? 0} ${an}</span></div>
+        ${match.ar1 ? `<div class="report-row"><span class="report-row-label">AR1</span><span class="report-row-val">${escapeHtml(match.ar1)}</span></div>` : ''}
+        ${match.ar2 ? `<div class="report-row"><span class="report-row-label">AR2</span><span class="report-row-val">${escapeHtml(match.ar2)}</span></div>` : ''}
+        ${match.tmo ? `<div class="report-row"><span class="report-row-label">TMO</span><span class="report-row-val">${escapeHtml(match.tmo)}</span></div>` : ''}
         <div class="report-row"><span class="report-row-label">Yellow Cards</span><span class="report-row-val">${a.yellowCards || 0}</span></div>
         <div class="report-row"><span class="report-row-label">Blue Cards</span><span class="report-row-val">${a.blueCards || 0}</span></div>
         <div class="report-row"><span class="report-row-label">Red Cards</span><span class="report-row-val">${a.redCards || 0}</span></div>
@@ -1639,15 +1710,15 @@ const App = {
               <span class="report-row-label">${area.label}</span>
               ${ratingBadge(a.ratings?.[area.id])}
             </div>
-            ${a.areaNotes?.[area.id] ? `<div style="font-size:13px;color:var(--text2);">${a.areaNotes[area.id]}</div>` : ''}
+            ${a.areaNotes?.[area.id] ? `<div style="font-size:13px;color:var(--text2);">${escapeHtml(a.areaNotes[area.id])}</div>` : ''}
           </div>
         `).join('')}
       </div>
 
       <div class="report-section">
         <div class="report-section-title">Penalty Count</div>
-        <div class="report-row"><span class="report-row-label">${match.homeTeam}</span><span class="report-row-val">${pkAgainst.home} penalties against</span></div>
-        <div class="report-row"><span class="report-row-label">${match.awayTeam}</span><span class="report-row-val">${pkAgainst.away} penalties against</span></div>
+        <div class="report-row"><span class="report-row-label">${hn}</span><span class="report-row-val">${pkAgainst.home} penalties against</span></div>
+        <div class="report-row"><span class="report-row-label">${an}</span><span class="report-row-val">${pkAgainst.away} penalties against</span></div>
       </div>
 
       <div class="report-section">
@@ -1659,11 +1730,11 @@ const App = {
 
       ${events.length > 0 ? `<div class="report-section"><div class="report-section-title">Full Event Log</div>${eventRows}</div>` : ''}
 
-      ${a.observations  ? `<div class="report-section"><div class="report-section-title">Key Observations</div><div class="report-text-block">${a.observations}</div></div>` : ''}
-      ${a.strengths     ? `<div class="report-section"><div class="report-section-title">Strengths</div><div class="report-text-block">${a.strengths}</div></div>` : ''}
-      ${a.development   ? `<div class="report-section"><div class="report-section-title">Areas for Development</div><div class="report-text-block">${a.development}</div></div>` : ''}
-      ${a.actions       ? `<div class="report-section"><div class="report-section-title">Action Points</div><div class="report-text-block">${a.actions}</div></div>` : ''}
-      ${a.selfAssessment? `<div class="report-section"><div class="report-section-title">Referee Self-Assessment</div><div class="report-text-block">${a.selfAssessment}</div></div>` : ''}
+      ${a.observations  ? `<div class="report-section"><div class="report-section-title">Key Observations</div><div class="report-text-block">${escapeHtml(a.observations)}</div></div>` : ''}
+      ${a.strengths     ? `<div class="report-section"><div class="report-section-title">Strengths</div><div class="report-text-block">${escapeHtml(a.strengths)}</div></div>` : ''}
+      ${a.development   ? `<div class="report-section"><div class="report-section-title">Areas for Development</div><div class="report-text-block">${escapeHtml(a.development)}</div></div>` : ''}
+      ${a.actions       ? `<div class="report-section"><div class="report-section-title">Action Points</div><div class="report-text-block">${escapeHtml(a.actions)}</div></div>` : ''}
+      ${a.selfAssessment? `<div class="report-section"><div class="report-section-title">Referee Self-Assessment</div><div class="report-text-block">${escapeHtml(a.selfAssessment)}</div></div>` : ''}
     `;
   },
 
@@ -1677,8 +1748,8 @@ const App = {
       ? new Date(match.date).toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' })
       : 'Unknown date';
 
-    const hn = match.homeTeam || 'Home';
-    const an = match.awayTeam || 'Away';
+    const hn = escapeHtml(match.homeTeam || 'Home');
+    const an = escapeHtml(match.awayTeam || 'Away');
     const teamName  = t => t === 'home' ? hn : an;
     const posLabel  = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
 
@@ -1715,8 +1786,8 @@ const App = {
       const note = a.areaNotes?.[area.id] || '';
       return `<tr>
         <td>${area.label}</td>
-        <td class="rc ${ratingClass(r)}">${r || '–'}</td>
-        <td>${note}</td>
+        <td class="rc ${ratingClass(r)}">${escapeHtml(r) || '–'}</td>
+        <td>${escapeHtml(note)}</td>
       </tr>`;
     }).join('');
 
@@ -1730,14 +1801,14 @@ const App = {
         </tr>`;
       }
       if (e.isScore) {
-        const sc = e.possession === 'home' ? (match.homeColour || '#1a3a6a') : (match.awayColour || '#1a3a6a');
+        const sc = safeColour(e.possession === 'home' ? match.homeColour : match.awayColour, '#1a3a6a');
         return `<tr style="background:#f0f7ff;border-left:3px solid ${sc};">
           <td style="white-space:nowrap;">${e.time}</td>
-          <td colspan="7" style="font-weight:bold;color:${sc};">&#9679; ${e.notes}</td>
+          <td colspan="7" style="font-weight:bold;color:${sc};">&#9679; ${escapeHtml(e.notes)}</td>
         </tr>`;
       }
       const card = e.card === 'yellow' ? 'YC' : e.card === 'blue' ? 'BC' : e.card === 'red' ? 'RC' : '';
-      const outcome = e.phase === 'Critical' ? (e.notes || '') : (e.outcome || '');
+      const outcome = e.phase === 'Critical' ? escapeHtml(e.notes || '') : (e.outcome || '');
       const infring = e.phase === 'Critical' ? '' : (e.infringement || '');
       return `<tr>
         <td style="white-space:nowrap;">${e.time}</td>
@@ -1784,7 +1855,7 @@ const App = {
         e.outcome    || null,
         e.infringement || null,
         e.against    ? `against ${teamName(e.against)}` : null,
-        e.notes      || null,
+        e.notes      ? escapeHtml(e.notes) : null,
       ].filter(Boolean).join(' · ');
       return `<tr style="background:#fffbe6;border-left:3px solid #f0a500;">
         <td style="white-space:nowrap;font-weight:bold;">🚩 ${e.time}</td>
@@ -1795,9 +1866,10 @@ const App = {
     }).join('');
 
     // ── HTML ───────────────────────────────────────────────
+    const refName = escapeHtml(ref ? ref.firstName + ' ' + ref.lastName : 'Referee');
     const html = `<!DOCTYPE html><html><head>
 <meta charset="UTF-8">
-<title>Coaching Report — ${ref ? ref.firstName + ' ' + ref.lastName : 'Referee'}</title>
+<title>Coaching Report — ${refName}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#111;background:#e8e8e8}
@@ -1861,23 +1933,23 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
 <div class="page">
   <div class="rh">
     <div class="rh-left">
-      <h1>${ref ? ref.firstName + ' ' + ref.lastName : 'Unknown Referee'}</h1>
-      <div class="sub">${match.homeTeam || 'Home'} v ${match.awayTeam || 'Away'}${match.competition ? ' · ' + match.competition : ''}</div>
-      <div class="sub">${date}${match.venue ? ' · ' + match.venue : ''}</div>
+      <h1>${refName}</h1>
+      <div class="sub">${hn} v ${an}${match.competition ? ' · ' + escapeHtml(match.competition) : ''}</div>
+      <div class="sub">${date}${match.venue ? ' · ' + escapeHtml(match.venue) : ''}</div>
     </div>
     <div class="rh-right">
-      <div class="score-teams">${match.homeTeam || 'Home'}</div>
+      <div class="score-teams">${hn}</div>
       <div class="score">${homeScore} – ${awayScore}</div>
-      <div class="score-teams">${match.awayTeam || 'Away'}</div>
+      <div class="score-teams">${an}</div>
     </div>
   </div>
 
   <div class="ig">
-    ${ref?.union ? `<div class="ir"><span class="il">Union/Club:</span><span class="iv">${ref.union}</span></div>` : '<div></div>'}
-    <div class="ir"><span class="il">Overall Rating:</span><span class="iv">${overall ? `<span class="ob ${overall.toLowerCase()}">${overall}</span>` : '–'}</span></div>
-    ${match.ar1 ? `<div class="ir"><span class="il">AR1:</span><span class="iv">${match.ar1}</span></div>` : '<div></div>'}
-    ${match.ar2 ? `<div class="ir"><span class="il">AR2:</span><span class="iv">${match.ar2}</span></div>` : '<div></div>'}
-    ${match.tmo ? `<div class="ir"><span class="il">TMO:</span><span class="iv">${match.tmo}</span></div>` : '<div></div>'}
+    ${ref?.union ? `<div class="ir"><span class="il">Union/Club:</span><span class="iv">${escapeHtml(ref.union)}</span></div>` : '<div></div>'}
+    <div class="ir"><span class="il">Overall Rating:</span><span class="iv">${overall ? `<span class="ob ${overall.toLowerCase()}">${escapeHtml(overall)}</span>` : '–'}</span></div>
+    ${match.ar1 ? `<div class="ir"><span class="il">AR1:</span><span class="iv">${escapeHtml(match.ar1)}</span></div>` : '<div></div>'}
+    ${match.ar2 ? `<div class="ir"><span class="il">AR2:</span><span class="iv">${escapeHtml(match.ar2)}</span></div>` : '<div></div>'}
+    ${match.tmo ? `<div class="ir"><span class="il">TMO:</span><span class="iv">${escapeHtml(match.tmo)}</span></div>` : '<div></div>'}
     <div class="ir"><span class="il">Yellow Cards:</span><span class="iv">${a.yellowCards || 0}</span></div>
     <div class="ir"><span class="il">Blue Cards:</span><span class="iv">${a.blueCards || 0}</span></div>
     <div class="ir"><span class="il">Red Cards:</span><span class="iv">${a.redCards || 0}</span></div>
@@ -1902,11 +1974,11 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
     </table>
   </div>
 
-  ${a.observations  ? `<div class="sec"><h2>Key Observations</h2><div class="tb">${a.observations}</div></div>` : ''}
-  ${a.strengths     ? `<div class="sec"><h2>Strengths</h2><div class="tb">${a.strengths}</div></div>` : ''}
-  ${a.development   ? `<div class="sec"><h2>Areas for Development</h2><div class="tb">${a.development}</div></div>` : ''}
-  ${a.actions       ? `<div class="sec"><h2>Action Points</h2><div class="tb">${a.actions}</div></div>` : ''}
-  ${a.selfAssessment? `<div class="sec"><h2>Referee Self-Assessment</h2><div class="tb">${a.selfAssessment}</div></div>` : ''}
+  ${a.observations  ? `<div class="sec"><h2>Key Observations</h2><div class="tb">${escapeHtml(a.observations)}</div></div>` : ''}
+  ${a.strengths     ? `<div class="sec"><h2>Strengths</h2><div class="tb">${escapeHtml(a.strengths)}</div></div>` : ''}
+  ${a.development   ? `<div class="sec"><h2>Areas for Development</h2><div class="tb">${escapeHtml(a.development)}</div></div>` : ''}
+  ${a.actions       ? `<div class="sec"><h2>Action Points</h2><div class="tb">${escapeHtml(a.actions)}</div></div>` : ''}
+  ${a.selfAssessment? `<div class="sec"><h2>Referee Self-Assessment</h2><div class="tb">${escapeHtml(a.selfAssessment)}</div></div>` : ''}
 </div>
 
 ${events.length > 0 ? `<div class="page-break"></div>
@@ -1914,7 +1986,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
   <div class="rh">
     <div class="rh-left">
       <h1>Game Notes</h1>
-      <div class="sub">${ref ? ref.firstName + ' ' + ref.lastName : ''} · ${match.homeTeam || 'Home'} v ${match.awayTeam || 'Away'} · ${date}</div>
+      <div class="sub">${refName} · ${hn} v ${an} · ${date}</div>
     </div>
   </div>
 
@@ -1927,10 +1999,10 @@ ${events.length > 0 ? `<div class="page-break"></div>
   </div>
 
   <div class="sec">
-    <h2>Penalty Summary  ·  ${match.homeTeam || 'Home'} ${pkAgainst.home} – ${pkAgainst.away} ${match.awayTeam || 'Away'}</h2>
+    <h2>Penalty Summary  ·  ${hn} ${pkAgainst.home} – ${pkAgainst.away} ${an}</h2>
     <div class="sg">
       <div class="sc">
-        <h3>${match.homeTeam || 'Home'} — ${pkAgainst.home} penalties against</h3>
+        <h3>${hn} — ${pkAgainst.home} penalties against</h3>
         <h3 style="margin-top:6px;">By Phase</h3>
         <table class="st"><thead><tr><th>Phase</th><th>Count</th></tr></thead><tbody>
           ${buildStatsRows(pkByPhase.home)}
@@ -1943,7 +2015,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
         </tbody></table>` : ''}
       </div>
       <div class="sc">
-        <h3>${match.awayTeam || 'Away'} — ${pkAgainst.away} penalties against</h3>
+        <h3>${an} — ${pkAgainst.away} penalties against</h3>
         <h3 style="margin-top:6px;">By Phase</h3>
         <table class="st"><thead><tr><th>Phase</th><th>Count</th></tr></thead><tbody>
           ${buildStatsRows(pkByPhase.away)}
@@ -1962,7 +2034,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
   <div class="sec">
     <h2>Penalty Location Heat Map</h2>
     <div class="hm">${heatCells}</div>
-    <div style="font-size:9px;color:#888;text-align:center;margin-top:4px;">← ${match.homeTeam || 'Home'} attacking end &nbsp;·&nbsp; Field Zones &nbsp;·&nbsp; ${match.awayTeam || 'Away'} attacking end →</div>
+    <div style="font-size:9px;color:#888;text-align:center;margin-top:4px;">← ${hn} attacking end &nbsp;·&nbsp; Field Zones &nbsp;·&nbsp; ${an} attacking end →</div>
   </div>` : ''}
 </div>` : ''}
 
@@ -2036,7 +2108,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
       a.selfAssessment? `\nREFEREE SELF-ASSESSMENT\n${a.selfAssessment}` : '',
     ].filter(Boolean).join('\n').trim();
 
-    const email   = ref?.email || '';
+    const email   = encodeURIComponent(ref?.email || '').replace(/%40/g, '@');
     const subject = encodeURIComponent(`Coaching Report — ${ref ? ref.firstName + ' ' + ref.lastName : 'Referee'} — ${date}`);
     window.location.href = `mailto:${email}?subject=${subject}&body=${encodeURIComponent(body)}`;
   },
@@ -2340,8 +2412,8 @@ const PhaseModal = {
     // When sides are swapped the physical left/right of the field reverses,
     // so the button order flips too. The data-pos values (22-home etc.) are
     // always team-relative and stay correct in stored events and reports.
-    const homeName = match?.homeTeam || 'Home';
-    const awayName = match?.awayTeam || 'Away';
+    const homeName = escapeHtml(match?.homeTeam || 'Home');
+    const awayName = escapeHtml(match?.awayTeam || 'Away');
     const posDefs = App._teamsSwapped
       ? [
           { pos: '22-away',   short: '22',   label: `${awayName} 22` },
@@ -2571,6 +2643,7 @@ const PhaseModal = {
 // ══════════════════════════════════════════════════════════
 
 document.addEventListener('DOMContentLoaded', () => {
+  Router._syncInert();
   App.renderHome();
 
   // Dismiss splash after a brief moment

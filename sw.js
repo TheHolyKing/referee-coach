@@ -1,6 +1,9 @@
-const VERSION = '1.5.8';
+const VERSION = '1.5.9';
 const CACHE   = 'refcoach-' + VERSION;
-const ASSETS  = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
+// Relative to this script's own location, so precaching works whether the
+// app is deployed at the domain root or a subpath (e.g. GitHub Pages'
+// /referee-coach/, which manifest.json's scope/start_url assume).
+const ASSETS  = ['./', './index.html', './styles.css', './app.js', './manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -20,8 +23,9 @@ self.addEventListener('fetch', e => {
   const { pathname } = new URL(e.request.url);
 
   // Network-first for the app shell and version file — always stay current.
-  // Falls back to cache if offline.
-  if (pathname.endsWith('.html') || pathname === '/' || pathname.endsWith('version.json')) {
+  // Falls back to cache if offline. pathname.endsWith('/') (rather than
+  // === '/') so this also matches a subpath deployment root.
+  if (pathname.endsWith('.html') || pathname.endsWith('/') || pathname.endsWith('version.json')) {
     e.respondWith(
       fetch(e.request)
         .then(res => {
@@ -29,7 +33,7 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
           return res;
         })
-        .catch(() => caches.match(e.request).then(r => r || caches.match('/index.html')))
+        .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
     );
     return;
   }
@@ -37,7 +41,7 @@ self.addEventListener('fetch', e => {
   // Cache-first for everything else (JS, CSS, icons)
   e.respondWith(
     caches.match(e.request)
-      .then(cached => cached || fetch(e.request).catch(() => caches.match('/index.html')))
+      .then(cached => cached || fetch(e.request).catch(() => caches.match('./index.html')))
   );
 });
 
