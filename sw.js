@@ -1,4 +1,4 @@
-const VERSION = '1.5.9';
+const VERSION = '1.5.10';
 const CACHE   = 'refcoach-' + VERSION;
 // Relative to this script's own location, so precaching works whether the
 // app is deployed at the domain root or a subpath (e.g. GitHub Pages'

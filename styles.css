@@ -59,10 +59,13 @@ html, body {
    stack; clip disallows scrolling outright. */
 #app { position: relative; height: 100%; overflow: clip; }
 
-/* Phone-first design stays full-bleed on actual phones; on wider viewports
-   (tablet/desktop browser) cap it to a phone-sized column instead of
-   stretching list rows, forms and tap targets uncomfortably wide. */
-@media (min-width: 640px) {
+/* Phone-first design stays full-bleed on actual phones AND touch tablets
+   (iPad etc. are plenty wide but should still use the full screen); only
+   cap to a phone-sized column for mouse-driven desktop/laptop browsers,
+   where a stretched-edge-to-edge layout looks wrong. hover:hover + pointer:
+   fine is true for a mouse, false for touch (even on a wide touchscreen),
+   so this targets the right axis instead of guessing from screen width. */
+@media (min-width: 640px) and (hover: hover) and (pointer: fine) {
   body { display: flex; justify-content: center; background: var(--surface); }
   #app {
     width: 428px;
