@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 190" width="400" height="190">
+  <defs>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#8ba4ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- wordmark -->
+  <text x="200" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" font-size="60" font-weight="800" fill="url(#textGrad)" letter-spacing="-1.5">REFEREE</text>
+  <text x="200" y="122" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" font-size="27" font-weight="700" fill="#2dd4bf" letter-spacing="4">PRO COACHING</text>
+  <text x="200" y="155" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#7b87ab" letter-spacing="3">RUGBY UNION</text>
+</svg>

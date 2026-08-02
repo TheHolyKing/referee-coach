@@ -16,7 +16,7 @@
   <div id="splash">
     <div class="splash-inner">
       <div class="splash-logo">
-        <img src="icons/logo-splash.png" alt="Referee Pro Coaching" style="width:200px;height:auto;display:block;">
+        <img src="icons/logo-splash.svg" alt="Referee Pro Coaching" style="width:200px;height:auto;display:block;">
       </div>
     </div>
   </div>
@@ -622,6 +622,24 @@
         <button class="score-picker-opt pk-followup-opt" onclick="App.takePKAs('QuickTap')">
           Quick Tap <span>Play on</span>
         </button>
+        <button class="score-picker-opt pk-followup-opt" onclick="App.takePKAs('PenaltyGoal')">
+          Penalty Goal <span>Kick at the posts</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL: PENALTY GOAL FOLLOW-UP ═══════════════════ -->
+    <div id="penalty-goal-followup-overlay" class="score-picker-overlay hidden">
+      <div class="score-picker">
+        <div class="score-picker-title">Penalty Goal</div>
+        <div class="score-picker-sub">Did it go over?</div>
+        <button class="score-picker-cancel" onclick="App.closePenaltyGoalFollowup()">Dismiss</button>
+        <button class="score-picker-opt" onclick="App.confirmPenaltyGoal(true)">
+          Scored <span>+3 points</span>
+        </button>
+        <button class="score-picker-opt" onclick="App.confirmPenaltyGoal(false)">
+          Missed <span>No points</span>
+        </button>
       </div>
     </div>
 
@@ -639,6 +657,21 @@
         </button>
         <button class="score-picker-opt" onclick="App.logAdvantageRestart('none')">
           Skip <span>Don't log a restart</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ MODAL: KICK TO TOUCH FOLLOW-UP ═══════════════════ -->
+    <div id="touch-followup-overlay" class="score-picker-overlay hidden">
+      <div class="score-picker">
+        <div class="score-picker-title">Kick to Touch</div>
+        <div class="score-picker-sub">Did it find touch?</div>
+        <button class="score-picker-cancel" onclick="App.closeTouchFollowup()">Dismiss</button>
+        <button class="score-picker-opt" onclick="App.confirmTouch(true)">
+          Found Touch <span>Log the lineout</span>
+        </button>
+        <button class="score-picker-opt" onclick="App.confirmTouch(false)">
+          Stayed in Play <span>Missed touch — play continues</span>
         </button>
       </div>
     </div>

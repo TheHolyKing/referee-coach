@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.12';
+const APP_VERSION = '2.0.0';
 
 // ══════════════════════════════════════════════════════════
 //  UTILS
@@ -2283,8 +2283,20 @@ ${events.length > 0 ? `<div class="page-break"></div>
       return;
     }
 
-    // Open Lineout or Scrum modal; time is captured fresh at this moment
-    // since the penalty kick itself just occurred
+    if (type === 'Lineout') {
+      // A kick to touch doesn't always find touch — confirm before
+      // assuming a lineout actually happens.
+      this.showTouchFollowup(againstTeam);
+      return;
+    }
+
+    if (type === 'PenaltyGoal') {
+      this.showPenaltyGoalFollowup(againstTeam);
+      return;
+    }
+
+    // Scrum — time is captured fresh at this moment since the penalty
+    // kick itself just occurred
     App.openPhase(type);
 
     // Pre-set possession to the team that received the penalty
@@ -2292,6 +2304,82 @@ ${events.length > 0 ? `<div class="page-break"></div>
       const receivingTeam = againstTeam === 'home' ? 'away' : 'home';
       PhaseModal.setTeam(receivingTeam);
     }
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  KICK-TO-TOUCH FOLLOW-UP FLOW
+  // ══════════════════════════════════════════════════════
+  _touchAgainst: null,
+
+  showTouchFollowup(againstTeam) {
+    this._touchAgainst = againstTeam;
+    document.getElementById('touch-followup-overlay').classList.remove('hidden');
+  },
+
+  closeTouchFollowup() {
+    document.getElementById('touch-followup-overlay').classList.add('hidden');
+    this._touchAgainst = null;
+  },
+
+  confirmTouch(foundTouch) {
+    const againstTeam = this._touchAgainst;
+    this.closeTouchFollowup();
+    const receivingTeam = againstTeam === 'home' ? 'away' : againstTeam === 'away' ? 'home' : null;
+
+    if (foundTouch) {
+      App.openPhase('Lineout');
+      if (receivingTeam) PhaseModal.setTeam(receivingTeam);
+      return;
+    }
+
+    // Missed touch — ball stayed in play. Log it for the record and let
+    // the referee carry on with whatever phase button fits next; there's
+    // no further modal since play is continuing in open field.
+    this.logEvent({
+      phase:      'Kick to Touch',
+      possession: receivingTeam,
+      outcome:    'No Touch',
+      against:    null,
+    });
+    this.toast('Missed touch — play continues');
+  },
+
+  // ══════════════════════════════════════════════════════
+  //  PENALTY GOAL FOLLOW-UP FLOW
+  // ══════════════════════════════════════════════════════
+  _penaltyGoalAgainst: null,
+
+  showPenaltyGoalFollowup(againstTeam) {
+    this._penaltyGoalAgainst = againstTeam;
+    document.getElementById('penalty-goal-followup-overlay').classList.remove('hidden');
+  },
+
+  closePenaltyGoalFollowup() {
+    document.getElementById('penalty-goal-followup-overlay').classList.add('hidden');
+    this._penaltyGoalAgainst = null;
+  },
+
+  confirmPenaltyGoal(scored) {
+    const againstTeam = this._penaltyGoalAgainst;
+    this.closePenaltyGoalFollowup();
+    const receivingTeam = againstTeam === 'home' ? 'away' : againstTeam === 'away' ? 'home' : null;
+    if (!receivingTeam) return;
+
+    if (scored) {
+      // Reuse the same scoring path as the scoreboard's + button so this
+      // is identical in every way to a manually-logged Penalty Goal.
+      this._scoringTeam = receivingTeam;
+      this.applyScore(3, 'Penalty Goal');
+      return;
+    }
+
+    this.logEvent({
+      phase:      'Penalty Goal',
+      possession: receivingTeam,
+      outcome:    'Missed',
+      against:    null,
+    });
+    this.toast('Penalty Goal missed');
   },
 
   // ══════════════════════════════════════════════════════
@@ -2631,13 +2719,15 @@ const PhaseModal = {
   },
 
   setPos(btn) {
-    this.position = btn.dataset.pos;
-    document.querySelectorAll('.pm-pos-btn').forEach(b => b.classList.toggle('active', b === btn));
+    // Toggle: tap the same position again to deselect
+    this.position = this.position === btn.dataset.pos ? null : btn.dataset.pos;
+    document.querySelectorAll('.pm-pos-btn').forEach(b => b.classList.toggle('active', b.dataset.pos === this.position));
   },
 
   setOutcome(btn) {
-    this.outcome = btn.dataset.val;
-    document.querySelectorAll('.pm-opt-btn.outcome').forEach(b => b.classList.toggle('active', b === btn));
+    // Toggle: tap the same outcome again to deselect
+    this.outcome = this.outcome === btn.dataset.val ? null : btn.dataset.val;
+    document.querySelectorAll('.pm-opt-btn.outcome').forEach(b => b.classList.toggle('active', b.dataset.val === this.outcome));
 
     // For Scrum Reset: swap infringement section to reset reasons
     if (this.phase === 'Scrum') {
@@ -2658,8 +2748,9 @@ const PhaseModal = {
   },
 
   setInfringement(btn) {
-    this.infringement = btn.dataset.val;
-    document.querySelectorAll('.pm-opt-btn.infringement').forEach(b => b.classList.toggle('active', b === btn));
+    // Toggle: tap the same infringement again to deselect
+    this.infringement = this.infringement === btn.dataset.val ? null : btn.dataset.val;
+    document.querySelectorAll('.pm-opt-btn.infringement').forEach(b => b.classList.toggle('active', b.dataset.val === this.infringement));
   },
 
   logReset(btn) {
@@ -2712,9 +2803,10 @@ const PhaseModal = {
   },
 
   setAgainst(team) {
-    this.against = team;
-    document.getElementById('pm-against-home').classList.toggle('active', team === 'home');
-    document.getElementById('pm-against-away').classList.toggle('active', team === 'away');
+    // Toggle: tap the same team again to deselect
+    this.against = this.against === team ? null : team;
+    document.getElementById('pm-against-home').classList.toggle('active', this.against === 'home');
+    document.getElementById('pm-against-away').classList.toggle('active', this.against === 'away');
   },
 
   setCard(type) {
