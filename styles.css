@@ -629,6 +629,7 @@ html, body {
 }
 .event-phase-badge.critical { background: var(--danger-soft); color: var(--danger); }
 .event-phase-badge.penalty  { background: var(--warn-soft); color: var(--warn); }
+.event-phase-badge.comment  { background: var(--accent-soft); color: var(--accent); }
 .event-body    { flex: 1; min-width: 0; line-height: 1.5; }
 .event-outcome { font-weight: 700; }
 
@@ -1084,6 +1085,15 @@ html, body {
 .btn-modal-cancel  { background: var(--surface2); color: var(--text); border: 1.5px solid var(--border2); }
 .btn-modal-confirm { background: var(--accent); color: white; }
 .btn-modal-danger  { background: var(--danger); color: white; }
+/* Optional 3rd button — a less-common alternative action, shown above the
+   cancel/confirm row so it reads as secondary rather than competing with
+   the primary choice. */
+.btn-modal-secondary {
+  display: block; width: 100%; margin-bottom: 10px;
+  background: var(--surface2); color: var(--text2);
+  border: 1.5px dashed var(--border2);
+}
+.btn-modal-secondary.btn-modal-danger { background: var(--danger-soft); color: var(--danger); border: 1.5px dashed rgba(248,113,113,0.4); }
 
 /* ── Score Picker ── */
 .score-picker-overlay {
@@ -1421,17 +1431,26 @@ html, body {
 }
 .phase-group-buttons { display: flex; gap: 7px; }
 .phase-group-buttons .btn-phase { flex: 1; }
+/* Structural only — colour comes from .btn-phase-critical / .btn-phase-comment */
 .btn-phase-full {
   width: 100%; padding: 11px;
-  border: 1.5px solid rgba(248,113,113,0.3);
   border-radius: 24px;
-  background: var(--danger-soft); color: var(--danger);
   font-size: 13px; font-weight: 700;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.1s, background 0.12s;
 }
-.btn-phase-full:active { transform: scale(0.97); background: rgba(248,113,113,0.25); }
+.btn-phase-full:active { transform: scale(0.97); }
+.btn-phase-full.btn-phase-critical {
+  border: 1.5px solid rgba(248,113,113,0.3);
+  background: var(--danger-soft); color: var(--danger);
+}
+.btn-phase-full.btn-phase-critical:active { background: rgba(248,113,113,0.25); }
+.btn-phase-full.btn-phase-comment {
+  border: 1.5px solid rgba(79,130,247,0.3);
+  background: var(--accent-soft); color: var(--accent);
+}
+.btn-phase-full.btn-phase-comment:active { background: rgba(79,130,247,0.25); }
 
 /* ── Swap indicator ── */
 .swap-indicator {

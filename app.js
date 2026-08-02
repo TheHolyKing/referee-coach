@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '1.5.11';
+const APP_VERSION = '1.5.12';
 
 // ══════════════════════════════════════════════════════════
 //  UTILS
@@ -17,6 +17,13 @@ function escapeHtml(str) {
 // (e.g. a hand-edited or corrupted backup-import file).
 function safeColour(hex, fallback) {
   return /^#[0-9a-fA-F]{3,8}$/.test(hex || '') ? hex : fallback;
+}
+
+// Phases logged as free text rather than team/position/outcome structure —
+// Critical Incident and the lighter-weight Comment button both use the
+// same textarea-only flow.
+function isFreeTextPhase(phase) {
+  return phase === 'Critical' || phase === 'Comment';
 }
 
 // Lazy-loads the SheetJS library only when an .xlsx/.xls import is actually
@@ -179,6 +186,10 @@ const PHASES = {
   'Critical': {
     outcomes: ['Yellow Card','Red Card','TMO Review','Injury','Scuffle','Warning','Penalty Try'],
     infringements: ['High Tackle','Foul Play','Dangerous Play','Repeated Infringement','Other']
+  },
+  'Comment': {
+    outcomes: [],
+    infringements: []
   }
 };
 
@@ -244,6 +255,24 @@ const Router = {
     this.stack[this.stack.length - 1] = screenId;
     const next = document.getElementById('screen-' + screenId);
     if (next) next.classList.add('active');
+    this._syncInert();
+  },
+
+  // Collapses the entire stack down to a single screen, e.g. going home
+  // after finishing a match, instead of popping one level at a time back
+  // through match-setup/live-match/assessment/report (which also means
+  // re-triggering live-match's "Exit Match?" prompt on the way through).
+  reset(screenId) {
+    this.stack.forEach(id => {
+      const el = document.getElementById('screen-' + id);
+      if (el) el.classList.remove('active', 'slide-left');
+    });
+    this.stack = [screenId];
+    const next = document.getElementById('screen-' + screenId);
+    if (next) {
+      next.offsetHeight; // force reflow before adding active
+      next.classList.add('active');
+    }
     this._syncInert();
   }
 };
@@ -449,13 +478,27 @@ const App = {
   },
 
   // ── Modal ───────────────────────────────────────────────
-  showModal(title, message, confirmLabel, confirmClass, onConfirm) {
+  // secondaryLabel/secondaryClass/onSecondary are optional — pass them to
+  // add a 3rd, less-common alternative action (e.g. "Discard & Exit")
+  // above the usual cancel/confirm row.
+  showModal(title, message, confirmLabel, confirmClass, onConfirm, secondaryLabel, secondaryClass, onSecondary) {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal-message').textContent = message;
     const btn = document.getElementById('modal-confirm');
     btn.textContent = confirmLabel;
     btn.className = 'btn-modal btn-modal-confirm' + (confirmClass ? ' ' + confirmClass : '');
     btn.onclick = () => { this.closeModal(); onConfirm(); };
+
+    const secBtn = document.getElementById('modal-secondary');
+    if (secondaryLabel) {
+      secBtn.textContent = secondaryLabel;
+      secBtn.className = 'btn-modal btn-modal-secondary' + (secondaryClass ? ' ' + secondaryClass : '');
+      secBtn.onclick = () => { this.closeModal(); onSecondary && onSecondary(); };
+      secBtn.classList.remove('hidden');
+    } else {
+      secBtn.classList.add('hidden');
+    }
+
     document.getElementById('modal-overlay').classList.remove('hidden');
   },
 
@@ -1333,6 +1376,7 @@ const App = {
     const posLabel = { 'half-home': `${hn} Half`, 'half-away': `${an} Half`, '22-home': `${hn} 22`, '22-away': `${an} 22` };
     const teamName = (t) => t === 'home' ? hn : an;
     const isCritical = (e) => e.phase === 'Critical';
+    const isComment  = (e) => e.phase === 'Comment';
     const isPK = (e) => e.outcome === 'PK' || e.phase === 'Pen Gen Play';
 
     log.innerHTML = events.slice().reverse().map(e => {
@@ -1359,8 +1403,8 @@ const App = {
         </div>`;
       }
 
-      const badgeClass = isCritical(e) ? 'critical' : isPK(e) ? 'penalty' : '';
-      const parts = isCritical(e)
+      const badgeClass = isCritical(e) ? 'critical' : isComment(e) ? 'comment' : isPK(e) ? 'penalty' : '';
+      const parts = (isCritical(e) || isComment(e))
         ? (e.notes ? escapeHtml(e.notes) : '<em style="color:var(--text2)">No text</em>')
         : [
             e.possession ? teamName(e.possession) : null,
@@ -1555,7 +1599,7 @@ const App = {
     document.getElementById(`count-${type}`).textContent = this._cards[type];
   },
 
-  saveAssessment() {
+  _persistAssessment() {
     const areaNotes = {};
     document.querySelectorAll('.rating-notes textarea').forEach(el => {
       if (el.dataset.area) areaNotes[el.dataset.area] = el.value.trim();
@@ -1578,9 +1622,42 @@ const App = {
     };
 
     State.updateMatch(this.currentMatchId, { assessment });
+  },
+
+  saveAssessment() {
+    this._persistAssessment();
     this.toast('Assessment saved');
     this.nav('report');
     this.renderReport();
+  },
+
+  // "Exit" is distinct from "Save": Save always continues on to show the
+  // report; Exit is for backing out of the flow entirely (finished for
+  // now, or done with this match altogether) and always lands back on
+  // Home instead of leaving live-match/assessment/report stacked behind
+  // whatever screen you end up on.
+  exitAssessment() {
+    this.showModal(
+      'Exit Assessment?',
+      'Save your progress so you can finish this later, or discard any changes made since you opened this screen.',
+      'Save & Exit', null,
+      () => {
+        this._persistAssessment();
+        this.toast('Assessment saved');
+        this._finishAndGoHome();
+      },
+      'Discard & Exit', 'btn-modal-danger',
+      () => this._finishAndGoHome()
+    );
+  },
+
+  _finishAndGoHome() {
+    Timer.pause();
+    this._releaseWakeLock();
+    this.currentMatchId = null;
+    this.currentMatch   = null;
+    Router.reset('home');
+    this.onScreenEnter('home');
   },
 
   // ══════════════════════════════════════════════════════
@@ -1644,7 +1721,7 @@ const App = {
           <span>${e.time}</span><span>${e.phase}</span>
         </div>`;
       }
-      const parts = e.phase === 'Critical'
+      const parts = isFreeTextPhase(e.phase)
         ? escapeHtml(e.notes || '')
         : [
             e.possession ? teamName(e.possession) : null,
@@ -1808,8 +1885,8 @@ const App = {
         </tr>`;
       }
       const card = e.card === 'yellow' ? 'YC' : e.card === 'blue' ? 'BC' : e.card === 'red' ? 'RC' : '';
-      const outcome = e.phase === 'Critical' ? escapeHtml(e.notes || '') : (e.outcome || '');
-      const infring = e.phase === 'Critical' ? '' : (e.infringement || '');
+      const outcome = isFreeTextPhase(e.phase) ? escapeHtml(e.notes || '') : (e.outcome || '');
+      const infring = isFreeTextPhase(e.phase) ? '' : (e.infringement || '');
       return `<tr>
         <td style="white-space:nowrap;">${e.time}</td>
         <td>${e.phase}</td>
@@ -2069,13 +2146,15 @@ ${events.length > 0 ? `<div class="page-break"></div>
     }).join('\n');
 
     const eventLines = events.map(e => {
-      const parts = [
-        e.possession ? teamName(e.possession) : null,
-        e.position   ? posLabel[e.position]   : null,
-        e.outcome    || null,
-        e.infringement || null,
-        e.against    ? `against ${teamName(e.against)}` : null,
-      ].filter(Boolean).join(' · ');
+      const parts = isFreeTextPhase(e.phase)
+        ? (e.notes || '')
+        : [
+            e.possession ? teamName(e.possession) : null,
+            e.position   ? posLabel[e.position]   : null,
+            e.outcome    || null,
+            e.infringement || null,
+            e.against    ? `against ${teamName(e.against)}` : null,
+          ].filter(Boolean).join(' · ');
       return `${e.time}  ${e.phase}  ${parts}`;
     }).join('\n');
 
@@ -2215,6 +2294,54 @@ ${events.length > 0 ? `<div class="page-break"></div>
     }
   },
 
+  // ══════════════════════════════════════════════════════
+  //  ADVANTAGE FOLLOW-UP FLOW
+  // ══════════════════════════════════════════════════════
+  _advantageCtx: null,
+
+  showAdvantageFollowup(ctx) {
+    this._advantageCtx = ctx;
+    const match = State.getMatch(this.currentMatchId);
+    const sub = document.getElementById('advantage-followup-sub');
+    if (sub && match) {
+      const infringingTeam = ctx.against === 'home' ? match.homeTeam : match.awayTeam;
+      sub.textContent = `What was awarded against ${infringingTeam || 'the infringing team'} for the original infringement?`;
+    }
+    document.getElementById('advantage-followup-overlay').classList.remove('hidden');
+  },
+
+  closeAdvantageFollowup() {
+    document.getElementById('advantage-followup-overlay').classList.add('hidden');
+    this._advantageCtx = null;
+  },
+
+  logAdvantageRestart(type) {
+    const ctx = this._advantageCtx;
+    this.closeAdvantageFollowup();
+    if (!ctx) return;
+
+    if (type === 'none') {
+      this.toast('No restart logged');
+      return;
+    }
+
+    this.logEvent({
+      phase:         'Pen Gen Play',
+      possession:    ctx.possession,
+      position:      ctx.position,
+      outcome:       type, // 'PK' or 'FK'
+      infringement:  ctx.infringement,
+      against:       ctx.against,
+      card:          null,
+      _capturedTime: ctx.capturedTime,
+    });
+    this.toast(`${type === 'PK' ? 'Penalty' : 'Free Kick'} logged for the original infringement`);
+
+    if (type === 'PK') {
+      this.showPKFollowup(ctx.against);
+    }
+  },
+
   shareReport() {
     if (navigator.share) {
       const match = State.getMatch(this.currentMatchId);
@@ -2256,14 +2383,18 @@ ${events.length > 0 ? `<div class="page-break"></div>
       'btn-modal-danger',
       () => {
         State.deleteMatch(this.currentMatchId);
-        this.currentMatchId = null;
-        this.currentMatch   = null;
         this.toast('Match deleted');
-        Router.pop();
-        Router.pop();
-        this.onScreenEnter(Router.current());
+        this._finishAndGoHome();
       }
     );
+  },
+
+  // The report itself is already saved by this point (Assessment's Save
+  // persists it before navigating here) — nothing new to confirm, so this
+  // just collapses straight back to Home instead of popping back through
+  // assessment/live-match/match-setup one screen at a time.
+  exitReport() {
+    this._finishAndGoHome();
   },
 
   confirmDeleteMatchFromProfile(matchId) {
@@ -2475,11 +2606,19 @@ const PhaseModal = {
     }
 
     // Show/hide sections based on phase
-    const isCritical = phase === 'Critical';
-    document.getElementById('pm-critical-section').classList.toggle('hidden', !isCritical);
-    document.getElementById('pm-structured-section').classList.toggle('hidden', isCritical);
-    document.getElementById('pm-card-section').classList.toggle('hidden', isCritical);
-    if (isCritical) document.getElementById('pm-critical-text').value = '';
+    const isFreeText = isFreeTextPhase(phase);
+    document.getElementById('pm-team-position-section').classList.toggle('hidden', isFreeText);
+    document.getElementById('pm-critical-section').classList.toggle('hidden', !isFreeText);
+    document.getElementById('pm-structured-section').classList.toggle('hidden', isFreeText);
+    document.getElementById('pm-card-section').classList.toggle('hidden', isFreeText);
+    if (isFreeText) {
+      document.getElementById('pm-critical-text').value = '';
+      const isComment = phase === 'Comment';
+      document.getElementById('pm-critical-label').textContent = isComment ? 'Comment' : 'Comment / Observation';
+      document.getElementById('pm-critical-text').placeholder = isComment
+        ? 'Quick note to come back to later…'
+        : 'Note a critical incident, key decision, or important observation…';
+    }
 
     document.getElementById('phase-modal-overlay').classList.remove('hidden');
     document.getElementById('phase-modal').scrollTop = 0;
@@ -2622,17 +2761,18 @@ const PhaseModal = {
   },
 
   done() {
-    const notes = this.phase === 'Critical'
+    const isFreeText = isFreeTextPhase(this.phase);
+    const notes = isFreeText
       ? document.getElementById('pm-critical-text').value.trim()
       : null;
 
     App.logEvent({
       phase:         this.phase,
-      possession:    this.phase === 'Critical' ? null : this.possession,
-      position:      this.phase === 'Critical' ? null : this.position,
+      possession:    isFreeText ? null : this.possession,
+      position:      isFreeText ? null : this.position,
       outcome:       this.outcome,
       infringement:  this.infringement,
-      against:       this.phase === 'Critical' ? null : this.against,
+      against:       isFreeText ? null : this.against,
       card:          this.card,
       flagged:       this.flagged,
       notes,
@@ -2646,6 +2786,20 @@ const PhaseModal = {
     // If a PK was awarded, ask the coach how it was taken next
     if (this.outcome === 'PK') {
       App.showPKFollowup(this.against);
+    }
+
+    // Advantage didn't develop — the referee is calling play back to the
+    // original infringement. Without this prompt that infringement (and
+    // whatever was awarded for it) never gets logged, so it drops out of
+    // the penalty count and the report entirely.
+    if (this.phase === 'Advantage' && this.outcome === 'Insufficient') {
+      App.showAdvantageFollowup({
+        possession:   this.possession,
+        position:     this.position,
+        infringement: this.infringement,
+        against:      this.against || (this.possession === 'home' ? 'away' : 'home'),
+        capturedTime: this._capturedTime,
+      });
     }
   }
 };

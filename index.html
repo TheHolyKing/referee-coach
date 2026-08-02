@@ -364,6 +364,7 @@
             <button class="btn-phase" onclick="App.openPhase('Free Kick')">Free Kick</button>
           </div>
         </div>
+        <button class="btn-phase btn-phase-comment btn-phase-full" onclick="App.openPhase('Comment')">💬 Add Comment</button>
         <button class="btn-phase btn-phase-critical btn-phase-full" onclick="App.openPhase('Critical')">⚠ Critical Incident</button>
       </div>
 
@@ -386,31 +387,32 @@
       <div class="phase-modal" id="phase-modal">
         <div class="pm-title" id="pm-title">Ruck</div>
 
-        <!-- Team selector -->
-        <div class="pm-section-label">Possession / Attacking Team</div>
-        <div class="pm-team-row">
-          <button class="pm-team-btn active" id="pm-team-home" onclick="PhaseModal.setTeam('home')">Home</button>
-          <button class="pm-team-btn" id="pm-team-away" onclick="PhaseModal.setTeam('away')">Away</button>
+        <!-- Team selector + position on field — hidden for free-text phases (Critical, Comment) -->
+        <div id="pm-team-position-section">
+          <div class="pm-section-label">Possession / Attacking Team</div>
+          <div class="pm-team-row">
+            <button class="pm-team-btn active" id="pm-team-home" onclick="PhaseModal.setTeam('home')">Home</button>
+            <button class="pm-team-btn" id="pm-team-away" onclick="PhaseModal.setTeam('away')">Away</button>
+          </div>
+
+          <div class="pm-section-label">Position on Field</div>
+          <div class="pm-position-box">
+            <div class="pm-position-label">Position on Field</div>
+            <div class="pm-position-row">
+              <button class="pm-pos-btn" data-pos="22-home" onclick="PhaseModal.setPos(this)">22</button>
+              <button class="pm-pos-btn" data-pos="half-home" onclick="PhaseModal.setPos(this)">Half</button>
+              <button class="pm-pos-btn" data-pos="half-away" onclick="PhaseModal.setPos(this)">Half</button>
+              <button class="pm-pos-btn" data-pos="22-away" onclick="PhaseModal.setPos(this)">22</button>
+            </div>
+            <div class="pm-position-sublabels">
+              <span>Home 22</span><span>Home Half</span><span>Away Half</span><span>Away 22</span>
+            </div>
+          </div>
         </div>
 
-        <!-- Position on field -->
-        <div class="pm-section-label">Position on Field</div>
-        <div class="pm-position-box">
-          <div class="pm-position-label">Position on Field</div>
-          <div class="pm-position-row">
-            <button class="pm-pos-btn" data-pos="22-home" onclick="PhaseModal.setPos(this)">22</button>
-            <button class="pm-pos-btn" data-pos="half-home" onclick="PhaseModal.setPos(this)">Half</button>
-            <button class="pm-pos-btn" data-pos="half-away" onclick="PhaseModal.setPos(this)">Half</button>
-            <button class="pm-pos-btn" data-pos="22-away" onclick="PhaseModal.setPos(this)">22</button>
-          </div>
-          <div class="pm-position-sublabels">
-            <span>Home 22</span><span>Home Half</span><span>Away Half</span><span>Away 22</span>
-          </div>
-        </div>
-
-        <!-- Critical free text (shown for Critical phase only) -->
+        <!-- Free text — shown for Critical and Comment phases -->
         <div id="pm-critical-section" class="hidden">
-          <div class="pm-section-label">Comment / Observation</div>
+          <div class="pm-section-label" id="pm-critical-label">Comment / Observation</div>
           <div style="padding: 0 16px;">
             <textarea id="pm-critical-text" class="pm-critical-textarea" rows="5" placeholder="Note a critical incident, key decision, or important observation…"></textarea>
           </div>
@@ -461,6 +463,7 @@
           <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
         </button>
         <h1>Assessment</h1>
+        <button class="btn-text" onclick="App.exitAssessment()">Exit</button>
         <button class="btn-text" onclick="App.saveAssessment()">Save</button>
       </header>
 
@@ -569,6 +572,7 @@
         <button class="btn-icon" onclick="App.shareReport()" aria-label="Share">
           <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>
         </button>
+        <button class="btn-text" onclick="App.exitReport()">Exit</button>
       </header>
       <div class="report-actions">
         <button class="btn-action" onclick="App.printReport()">
@@ -621,11 +625,30 @@
       </div>
     </div>
 
+    <!-- ═══════════════════ MODAL: ADVANTAGE FOLLOW-UP ═══════════════════ -->
+    <div id="advantage-followup-overlay" class="score-picker-overlay hidden">
+      <div class="score-picker">
+        <div class="score-picker-title">Advantage Over</div>
+        <div class="score-picker-sub" id="advantage-followup-sub">Award the original infringement.</div>
+        <button class="score-picker-cancel" onclick="App.closeAdvantageFollowup()">Dismiss</button>
+        <button class="score-picker-opt" onclick="App.logAdvantageRestart('PK')">
+          Penalty Kick <span>Award and log the restart</span>
+        </button>
+        <button class="score-picker-opt" onclick="App.logAdvantageRestart('FK')">
+          Free Kick <span>Award and log the restart</span>
+        </button>
+        <button class="score-picker-opt" onclick="App.logAdvantageRestart('none')">
+          Skip <span>Don't log a restart</span>
+        </button>
+      </div>
+    </div>
+
     <!-- ═══════════════════ MODAL: CONFIRM ═══════════════════ -->
     <div id="modal-overlay" class="modal-overlay hidden" onclick="App.closeModal()">
       <div class="modal" onclick="event.stopPropagation()">
         <div id="modal-title" class="modal-title"></div>
         <div id="modal-message" class="modal-message"></div>
+        <button id="modal-secondary" class="btn-modal btn-modal-secondary hidden"></button>
         <div class="modal-actions">
           <button id="modal-cancel" class="btn-modal btn-modal-cancel" onclick="App.closeModal()">Cancel</button>
           <button id="modal-confirm" class="btn-modal btn-modal-confirm">Confirm</button>
