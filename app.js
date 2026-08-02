@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 
 // ══════════════════════════════════════════════════════════
 //  UTILS
@@ -1422,11 +1422,12 @@ const App = {
 
       const flagBadge = e.flagged ? '<span class="flag-badge">🚩 Review</span>' : '';
       const flagClass = e.flagged ? ' event-flagged' : '';
+      const flagNoteHtml = (e.flagged && e.flagNote) ? `<div class="event-flag-note">🚩 ${escapeHtml(e.flagNote)}</div>` : '';
 
       return `<div class="event-entry${flagClass}" onclick="App.selectEvent(this)">
         <span class="event-time">${e.time}</span>
         <span class="event-phase-badge ${badgeClass}">${e.phase}</span>
-        <span class="event-body">${parts}</span>
+        <div class="event-body">${parts}${flagNoteHtml}</div>
         ${flagBadge}
         ${cardBadge}
         ${against}
@@ -1745,9 +1746,13 @@ const App = {
         e.against    ? `→ against ${teamName(e.against)}` : null,
         e.notes      ? escapeHtml(e.notes) : null,
       ].filter(Boolean).join(' · ');
-      return `<div class="report-row report-row-flagged">
-        <span class="report-row-label">🚩 ${e.time} <strong>${e.phase}</strong></span>
-        <span class="report-row-val" style="font-size:13px;text-align:right;">${parts || '–'}</span>
+      const noteHtml = e.flagNote ? `<div class="report-flag-note">${escapeHtml(e.flagNote)}</div>` : '';
+      return `<div class="report-row report-row-flagged" style="flex-direction:column;align-items:flex-start;gap:6px;">
+        <div style="display:flex;justify-content:space-between;width:100%;gap:12px;">
+          <span class="report-row-label">🚩 ${e.time} <strong>${e.phase}</strong></span>
+          <span class="report-row-val" style="font-size:13px;text-align:right;">${parts || '–'}</span>
+        </div>
+        ${noteHtml}
       </div>`;
     }).join('');
 
@@ -1934,12 +1939,16 @@ const App = {
         e.against    ? `against ${teamName(e.against)}` : null,
         e.notes      ? escapeHtml(e.notes) : null,
       ].filter(Boolean).join(' · ');
+      const noteRow = e.flagNote ? `<tr style="background:#fffbe6;border-left:3px solid #f0a500;">
+        <td></td>
+        <td colspan="7" style="font-style:italic;padding-top:0;">${escapeHtml(e.flagNote)}</td>
+      </tr>` : '';
       return `<tr style="background:#fffbe6;border-left:3px solid #f0a500;">
         <td style="white-space:nowrap;font-weight:bold;">🚩 ${e.time}</td>
         <td><strong>${e.phase}</strong></td>
         <td colspan="5">${parts || '–'}</td>
         <td></td>
-      </tr>`;
+      </tr>${noteRow}`;
     }).join('');
 
     // ── HTML ───────────────────────────────────────────────
@@ -2158,6 +2167,21 @@ ${events.length > 0 ? `<div class="page-break"></div>
       return `${e.time}  ${e.phase}  ${parts}`;
     }).join('\n');
 
+    const flaggedEvents = events.filter(e => e.flagged && !e.isMarker);
+    const flaggedLines = flaggedEvents.map(e => {
+      const parts = isFreeTextPhase(e.phase)
+        ? (e.notes || '')
+        : [
+            e.possession ? teamName(e.possession) : null,
+            e.position   ? posLabel[e.position]   : null,
+            e.outcome    || null,
+            e.infringement || null,
+            e.against    ? `against ${teamName(e.against)}` : null,
+          ].filter(Boolean).join(' · ');
+      const noteLine = e.flagNote ? `\n   → ${e.flagNote}` : '';
+      return `${e.time}  ${e.phase}  ${parts}${noteLine}`;
+    }).join('\n\n');
+
     const body = [
       `REFEREE COACHING REPORT`,
       `═══════════════════════`,
@@ -2167,6 +2191,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
       match.competition ? `Competition: ${match.competition}` : '',
       match.venue       ? `Venue: ${match.venue}`             : '',
       ``,
+      flaggedEvents.length ? `🚩 REVIEW ITEMS (${flaggedEvents.length})\n─────────────────\n${flaggedLines}\n` : '',
       `OVERALL RATING: ${a.ratings?.overall || 'Not rated'}`,
       ``,
       `PERFORMANCE AREAS\n─────────────────`,
@@ -2836,6 +2861,10 @@ const PhaseModal = {
     document.getElementById('pm-card-red').classList.remove('active');
     const flagBtn = document.getElementById('pm-flag-btn');
     if (flagBtn) flagBtn.classList.remove('active');
+    const flagNoteWrap = document.getElementById('pm-flag-note-wrap');
+    if (flagNoteWrap) flagNoteWrap.classList.add('hidden');
+    const flagNoteEl = document.getElementById('pm-flag-note');
+    if (flagNoteEl) flagNoteEl.value = '';
     // Restore infringement label and buttons if we were in a scrum reset state
     const infLabel = document.getElementById('pm-infringement-label');
     if (infLabel) infLabel.textContent = 'Infringement';
@@ -2846,6 +2875,12 @@ const PhaseModal = {
   toggleFlag() {
     this.flagged = !this.flagged;
     document.getElementById('pm-flag-btn').classList.toggle('active', this.flagged);
+    const noteWrap = document.getElementById('pm-flag-note-wrap');
+    if (noteWrap) noteWrap.classList.toggle('hidden', !this.flagged);
+    if (this.flagged) {
+      const noteEl = document.getElementById('pm-flag-note');
+      if (noteEl) setTimeout(() => noteEl.focus(), 50);
+    }
   },
 
   cancel() {
@@ -2857,6 +2892,9 @@ const PhaseModal = {
     const notes = isFreeText
       ? document.getElementById('pm-critical-text').value.trim()
       : null;
+    const flagNote = this.flagged
+      ? (document.getElementById('pm-flag-note')?.value.trim() || '')
+      : '';
 
     App.logEvent({
       phase:         this.phase,
@@ -2867,6 +2905,7 @@ const PhaseModal = {
       against:       isFreeText ? null : this.against,
       card:          this.card,
       flagged:       this.flagged,
+      flagNote,
       notes,
       _capturedTime: this._capturedTime,
     });

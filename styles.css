@@ -690,6 +690,12 @@ html, body {
   background: var(--warn-soft); color: #7a5200;
   flex-shrink: 0; align-self: center;
 }
+.event-flag-note {
+  margin-top: 4px;
+  font-size: 12px; font-style: italic;
+  color: var(--warn);
+  line-height: 1.4;
+}
 
 /* ── Quick Notes ── */
 .quick-notes-area { padding: 0 16px; flex-shrink: 0; }
@@ -851,6 +857,18 @@ html, body {
   transition: all 0.15s; text-align: center;
 }
 .pm-btn-flag.active { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+
+.pm-flag-note-wrap { padding: 8px 16px 0; }
+.pm-flag-note-textarea {
+  width: 100%;
+  background: var(--warn-soft);
+  border: 1.5px solid rgba(245,158,11,0.35); border-radius: var(--radius-sm);
+  padding: 11px 13px; color: var(--text);
+  font-size: 14px; font-family: inherit;
+  resize: none; outline: none; line-height: 1.5;
+}
+.pm-flag-note-textarea::placeholder { color: #b08a3f; }
+.pm-flag-note-textarea:focus { border-color: var(--warn); }
 
 .pm-card-row { display: flex; gap: 10px; padding: 0 16px; }
 .pm-card-btn {
@@ -1022,6 +1040,13 @@ html, body {
   background: rgba(245,158,11,0.07);
   border-left: 3px solid var(--warn);
   padding-left: 8px; border-radius: 4px; margin-bottom: 4px;
+}
+.report-flag-note {
+  width: 100%;
+  font-size: 13px; color: var(--text); line-height: 1.5;
+  background: rgba(245,158,11,0.1);
+  border-left: 2px solid var(--warn);
+  padding: 6px 10px; border-radius: 4px;
 }
 
 /* ── Match History ── */
