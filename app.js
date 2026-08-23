@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '2.0.1';
+const APP_VERSION = '2.1.0';
 
 // ══════════════════════════════════════════════════════════
 //  UTILS
@@ -209,6 +209,136 @@ const AREAS = [
 ];
 
 // ══════════════════════════════════════════════════════════
+//  MATCH INSIGHTS — stats summary + rule-based coaching
+//  suggestions, computed entirely from data already logged.
+//  No AI/API calls; every suggestion below is a deterministic
+//  threshold on real event/rating data, so it stays explainable
+//  and works fully offline.
+// ══════════════════════════════════════════════════════════
+
+function computeMatchInsights(match) {
+  const events = (match.liveData?.events || []).filter(e => !e.isMarker && !e.isScore);
+  const a  = match.assessment || {};
+  const hn = match.homeTeam || 'Home';
+  const an = match.awayTeam || 'Away';
+
+  const phaseCounts = {};
+  const infringementCounts = {};
+  const pkAgainst = { home: 0, away: 0 };
+  const cards = { yellow: 0, blue: 0, red: 0 };
+  let flaggedCount = 0;
+  let setPieceInfringements = 0;
+
+  events.forEach(e => {
+    if (e.phase) phaseCounts[e.phase] = (phaseCounts[e.phase] || 0) + 1;
+    if (e.infringement) infringementCounts[e.infringement] = (infringementCounts[e.infringement] || 0) + 1;
+    if (e.outcome === 'PK' && e.against) pkAgainst[e.against]++;
+    if (e.card === 'yellow') cards.yellow++;
+    if (e.card === 'blue')   cards.blue++;
+    if (e.card === 'red')    cards.red++;
+    if (e.flagged) flaggedCount++;
+    if (['Scrum', 'Lineout', 'Maul'].includes(e.phase) && e.infringement) setPieceInfringements++;
+  });
+
+  const sortByCountDesc = obj => Object.entries(obj).sort((x, y) => y[1] - x[1]);
+  const busiestPhaseEntry     = sortByCountDesc(phaseCounts)[0];
+  const topInfringementEntry  = sortByCountDesc(infringementCounts)[0];
+  const totalPK = pkAgainst.home + pkAgainst.away;
+
+  const stats = {
+    totalEvents:      events.length,
+    cards,
+    pkAgainst,
+    busiestPhase:     busiestPhaseEntry    ? { phase: busiestPhaseEntry[0], count: busiestPhaseEntry[1] }       : null,
+    topInfringement:  topInfringementEntry ? { name: topInfringementEntry[0], count: topInfringementEntry[1] }  : null,
+    flaggedCount,
+  };
+
+  const suggestions = [];
+
+  if (setPieceInfringements >= 3) {
+    suggestions.push({
+      area: 'setpiece',
+      text: `${setPieceInfringements} set-piece infringements logged across scrum/lineout/maul — worth reviewing engagement timing and detail at these phases.`
+    });
+  }
+
+  if (totalPK >= 6) {
+    const more = Math.max(pkAgainst.home, pkAgainst.away);
+    const less = Math.min(pkAgainst.home, pkAgainst.away);
+    if (less === 0 || more / Math.max(less, 1) >= 2.5) {
+      const skewedTeam = pkAgainst.home > pkAgainst.away ? hn : an;
+      suggestions.push({
+        area: 'consistency',
+        text: `Penalties were heavily skewed toward ${skewedTeam} (${pkAgainst.home}–${pkAgainst.away}) — worth reflecting on whether the same standard was applied to both teams.`
+      });
+    }
+  }
+
+  if (cards.yellow + cards.blue + cards.red > 0) {
+    suggestions.push({
+      area: 'gamecontrol',
+      text: `${cards.yellow} yellow, ${cards.blue} blue, ${cards.red} red card(s) issued — worth noting whether warnings or captain conversations were used before cards became necessary.`
+    });
+  }
+
+  if (topInfringementEntry && topInfringementEntry[1] >= 4) {
+    suggestions.push({
+      area: 'laws',
+      text: `"${topInfringementEntry[0]}" was called ${topInfringementEntry[1]} times, more than any other infringement — a specific law area worth focusing development on.`
+    });
+  }
+
+  if (flaggedCount >= 1) {
+    suggestions.push({
+      area: 'communication',
+      text: `${flaggedCount} moment${flaggedCount > 1 ? 's' : ''} flagged for review during the match — these are often useful starting points for the post-match conversation.`
+    });
+  }
+
+  return { stats, suggestions, ratings: a.ratings || {} };
+}
+
+// Looks at a referee's assessed match history (including the current
+// match, since matchesForReferee() already includes it once saved) and
+// flags rating patterns — e.g. an area rated OK/Poor in most of the last
+// few matches. Needs at least 3 assessed matches to say anything; a
+// "trend" from 1-2 data points isn't meaningful.
+function computeRefereeTrends(refereeId) {
+  const assessed = State.matchesForReferee(refereeId).filter(m => m.assessment);
+  const recent = assessed.slice(0, 5);
+  if (recent.length < 3) return null;
+
+  const trends = [];
+  AREAS.forEach(area => {
+    const ratings = recent.map(m => m.assessment.ratings?.[area.id]).filter(Boolean);
+    if (ratings.length < 3) return;
+
+    const lowCount = ratings.filter(r => r === 'OK' || r === 'Poor').length;
+    if (lowCount / ratings.length >= 0.6) {
+      trends.push({
+        area: area.id,
+        label: area.label,
+        positive: false,
+        text: `Rated OK or below in ${lowCount} of your last ${ratings.length} assessed matches.`
+      });
+      return;
+    }
+
+    if (ratings.length >= 3 && ratings.every(r => r === 'Excellent')) {
+      trends.push({
+        area: area.id,
+        label: area.label,
+        positive: true,
+        text: `Rated Excellent in all of your last ${ratings.length} assessed matches — a real strength.`
+      });
+    }
+  });
+
+  return { matchCount: recent.length, trends };
+}
+
+// ══════════════════════════════════════════════════════════
 //  ROUTER / NAVIGATION
 // ══════════════════════════════════════════════════════════
 
@@ -336,14 +466,17 @@ const Timer = {
   },
 
   render() {
-    const el = document.getElementById('live-timer');
-    if (!el) return;
     const m = Math.floor(this.elapsed / 60);
     const s = this.elapsed % 60;
-    el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    const timeStr = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
 
-    const badge = document.getElementById('live-phase-badge');
-    if (!badge) return;
+    // Mirrored onto the phase modal's own clock bar so it stays visible
+    // (and pausable) while the modal covers the live-match screen.
+    const el = document.getElementById('live-timer');
+    if (el) el.textContent = timeStr;
+    const pmClock = document.getElementById('pm-clock-time');
+    if (pmClock) pmClock.textContent = timeStr;
+
     const labels = {
       pregame:  '',
       first:    '1st Half',
@@ -351,16 +484,36 @@ const Timer = {
       second:   '2nd Half',
       fulltime: 'Full Time',
     };
-    badge.textContent = labels[this.matchPhase] || '';
-    badge.className = 'live-phase-badge' + (
+    const badgeExtra = (
       this.matchPhase === 'halftime' ? ' phase-ht' :
       this.matchPhase === 'fulltime' ? ' phase-ft' : ''
     );
+
+    const badge = document.getElementById('live-phase-badge');
+    if (badge) {
+      badge.textContent = labels[this.matchPhase] || '';
+      badge.className = 'live-phase-badge' + badgeExtra;
+    }
+    const pmBadge = document.getElementById('pm-clock-phase-badge');
+    if (pmBadge) {
+      pmBadge.textContent = labels[this.matchPhase] || '';
+      pmBadge.className = 'live-phase-badge' + badgeExtra;
+    }
   },
 
   renderControls() {
     const toggleBtn   = document.getElementById('btn-timer-toggle');
     const halftimeBtn = document.getElementById('btn-halftime');
+
+    // Phase modal's own Pause/Start button — kept in sync even though the
+    // main live-match controls underneath are covered by the modal.
+    const pmClockBtn = document.getElementById('pm-clock-btn');
+    if (pmClockBtn) {
+      pmClockBtn.textContent = this.matchPhase === 'fulltime' ? 'Full Time' : (this.running ? 'Pause' : 'Start');
+      pmClockBtn.disabled = this.matchPhase === 'fulltime';
+      pmClockBtn.classList.toggle('paused', !this.running);
+    }
+
     if (!toggleBtn || !halftimeBtn) return;
 
     // Start/Pause label
@@ -1756,7 +1909,52 @@ const App = {
       </div>`;
     }).join('');
 
+    // ── Match Insights: stats snapshot + rule-based suggestions, plus
+    // cross-match trends for this referee if they have enough history ──
+    const insights  = computeMatchInsights(match);
+    const trendData = computeRefereeTrends(match.refereeId);
+    const hasAnyInsight = insights.stats.totalEvents > 0 || insights.suggestions.length > 0 || (trendData && trendData.trends.length > 0);
+
+    const insightStatsHtml = `
+      <div class="insights-stats-grid">
+        <div class="insight-stat"><div class="insight-stat-val">${insights.stats.totalEvents}</div><div class="insight-stat-label">Events Logged</div></div>
+        <div class="insight-stat"><div class="insight-stat-val">${insights.stats.cards.yellow + insights.stats.cards.blue + insights.stats.cards.red}</div><div class="insight-stat-label">Cards</div></div>
+        <div class="insight-stat"><div class="insight-stat-val">${insights.stats.busiestPhase ? escapeHtml(insights.stats.busiestPhase.phase) : '–'}</div><div class="insight-stat-label">Busiest Phase</div></div>
+        <div class="insight-stat"><div class="insight-stat-val">${insights.stats.topInfringement ? escapeHtml(insights.stats.topInfringement.name) : '–'}</div><div class="insight-stat-label">Top Infringement</div></div>
+      </div>`;
+
+    const insightSuggestionsHtml = insights.suggestions.length ? `
+      <div class="insight-suggestions">
+        <div class="insight-suggestions-label">Suggested Focus Areas</div>
+        ${insights.suggestions.map(s => {
+          const areaLabel = AREAS.find(ar => ar.id === s.area)?.label || s.area;
+          const rating = insights.ratings[s.area];
+          return `<div class="insight-suggestion">
+            <div class="insight-suggestion-header">
+              <span>${escapeHtml(areaLabel)}</span>
+              ${rating ? `<span class="rating-badge ${rating}">${escapeHtml(rating)}</span>` : ''}
+            </div>
+            <div class="insight-suggestion-text">${escapeHtml(s.text)}</div>
+          </div>`;
+        }).join('')}
+      </div>` : '';
+
+    const insightTrendsHtml = (trendData && trendData.trends.length) ? `
+      <div class="insight-trends">
+        <div class="insight-suggestions-label">Trend — Last ${trendData.matchCount} Assessed Matches</div>
+        ${trendData.trends.map(t => `<div class="insight-trend${t.positive ? ' positive' : ''}">${t.positive ? '✓' : '⚠'} <strong>${escapeHtml(t.label)}:</strong> ${escapeHtml(t.text)}</div>`).join('')}
+      </div>` : '';
+
+    const insightsBlock = hasAnyInsight ? `
+      <div class="report-section report-section-insights">
+        <div class="report-section-title">📊 Match Insights</div>
+        ${insightStatsHtml}
+        ${insightSuggestionsHtml}
+        ${insightTrendsHtml}
+      </div>` : '';
+
     document.getElementById('report-content').innerHTML = `
+      ${insightsBlock}
       ${flaggedEvents.length > 0 ? `
       <div class="report-section report-section-review">
         <div class="report-section-title">🚩 Review Items (${flaggedEvents.length})</div>
@@ -1951,6 +2149,40 @@ const App = {
       </tr>${noteRow}`;
     }).join('');
 
+    // ── match insights ──────────────────────────────────────
+    const insights  = computeMatchInsights(match);
+    const trendData = computeRefereeTrends(match.refereeId);
+    const hasAnyInsight = insights.stats.totalEvents > 0 || insights.suggestions.length > 0 || (trendData && trendData.trends.length > 0);
+
+    const miStatsHtml = `<div class="mi-stats">
+      <div class="mi-stat"><div class="mi-stat-val">${insights.stats.totalEvents}</div><div class="mi-stat-label">Events</div></div>
+      <div class="mi-stat"><div class="mi-stat-val">${insights.stats.cards.yellow + insights.stats.cards.blue + insights.stats.cards.red}</div><div class="mi-stat-label">Cards</div></div>
+      <div class="mi-stat"><div class="mi-stat-val">${insights.stats.busiestPhase ? escapeHtml(insights.stats.busiestPhase.phase) : '–'}</div><div class="mi-stat-label">Busiest Phase</div></div>
+      <div class="mi-stat"><div class="mi-stat-val">${insights.stats.topInfringement ? escapeHtml(insights.stats.topInfringement.name) : '–'}</div><div class="mi-stat-label">Top Infringement</div></div>
+    </div>`;
+
+    const miSuggestionsHtml = insights.suggestions.map(s => {
+      const areaLabel = AREAS.find(ar => ar.id === s.area)?.label || s.area;
+      const rating = insights.ratings[s.area];
+      return `<div class="mi-sugg">
+        <div class="mi-sugg-head"><span>${escapeHtml(areaLabel)}</span>${rating ? `<span class="ob ${rating.toLowerCase()}">${escapeHtml(rating)}</span>` : ''}</div>
+        <div>${escapeHtml(s.text)}</div>
+      </div>`;
+    }).join('');
+
+    const miTrendsHtml = (trendData && trendData.trends.length) ? `<div style="margin-top:6px;">
+      <h3>Trend — Last ${trendData.matchCount} Assessed Matches</h3>
+      ${trendData.trends.map(t => `<div class="mi-trend${t.positive ? ' positive' : ''}">${t.positive ? '✓' : '⚠'} <strong>${escapeHtml(t.label)}:</strong> ${escapeHtml(t.text)}</div>`).join('')}
+    </div>` : '';
+
+    const insightsPrintBlock = hasAnyInsight ? `
+      <div class="sec mi">
+        <h2>📊 Match Insights</h2>
+        ${miStatsHtml}
+        ${miSuggestionsHtml}
+        ${miTrendsHtml}
+      </div>` : '';
+
     // ── HTML ───────────────────────────────────────────────
     const refName = escapeHtml(ref ? ref.firstName + ' ' + ref.lastName : 'Referee');
     const html = `<!DOCTYPE html><html><head>
@@ -2012,6 +2244,17 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
 .hl{font-size:9px;margin-bottom:4px}
 .hn{font-size:22px;font-weight:bold}
 .page-break{page-break-after:always}
+/* match insights */
+.mi{border:2px solid #b3c9f5;border-radius:6px;padding:10px 12px;background:#eef4ff}
+.mi h2{color:#1a4a8a;border-bottom-color:#1a4a8a}
+.mi-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.mi-stat{background:white;border:1px solid #ddd;border-radius:6px;padding:6px 4px;text-align:center}
+.mi-stat-val{font-size:12px;font-weight:bold;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mi-stat-label{font-size:8px;color:#888;text-transform:uppercase;margin-top:2px}
+.mi-sugg{background:white;border:1px solid #ddd;border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:10px}
+.mi-sugg-head{display:flex;justify-content:space-between;font-weight:bold;margin-bottom:2px}
+.mi-trend{font-size:10px;padding:4px 0;border-bottom:1px solid #eee}
+.mi-trend.positive{color:#0a6030}
 </style></head><body>
 <button class="no-print close-btn" onclick="window.close()">&#8592; Close</button>
 <button class="no-print print-btn" onclick="window.print()">&#128438; Print / Save PDF</button>
@@ -2041,6 +2284,8 @@ h3{font-size:10px;font-weight:bold;color:#1a3a6a;margin-bottom:5px}
     <div class="ir"><span class="il">Red Cards:</span><span class="iv">${a.redCards || 0}</span></div>
     <div class="ir"><span class="il">Events Logged:</span><span class="iv">${events.length}</span></div>
   </div>
+
+  ${insightsPrintBlock}
 
   ${flaggedEvents.length > 0 ? `
   <div class="sec" style="border:2px solid #f0a500;border-radius:6px;padding:10px 12px;background:#fffbe6;">
@@ -2182,6 +2427,24 @@ ${events.length > 0 ? `<div class="page-break"></div>
       return `${e.time}  ${e.phase}  ${parts}${noteLine}`;
     }).join('\n\n');
 
+    const insights  = computeMatchInsights(match);
+    const trendData = computeRefereeTrends(match.refereeId);
+    const insightLines = [
+      `Events Logged: ${insights.stats.totalEvents}`,
+      `Cards: ${insights.stats.cards.yellow} Yellow, ${insights.stats.cards.blue} Blue, ${insights.stats.cards.red} Red`,
+      insights.stats.busiestPhase    ? `Busiest Phase: ${insights.stats.busiestPhase.phase} (${insights.stats.busiestPhase.count})` : '',
+      insights.stats.topInfringement ? `Top Infringement: ${insights.stats.topInfringement.name} (${insights.stats.topInfringement.count})` : '',
+      insights.suggestions.length ? `\nSuggested Focus Areas:` : '',
+      ...insights.suggestions.map(s => {
+        const areaLabel = AREAS.find(ar => ar.id === s.area)?.label || s.area;
+        const rating = insights.ratings[s.area];
+        return `- ${areaLabel}${rating ? ` [${rating}]` : ''}: ${s.text}`;
+      }),
+      (trendData && trendData.trends.length) ? `\nTrend (last ${trendData.matchCount} assessed matches):` : '',
+      ...((trendData && trendData.trends.length) ? trendData.trends.map(t => `${t.positive ? '✓' : '⚠'} ${t.label}: ${t.text}`) : []),
+    ].filter(Boolean).join('\n');
+    const hasAnyInsight = insights.stats.totalEvents > 0 || insights.suggestions.length > 0 || (trendData && trendData.trends.length > 0);
+
     const body = [
       `REFEREE COACHING REPORT`,
       `═══════════════════════`,
@@ -2191,6 +2454,7 @@ ${events.length > 0 ? `<div class="page-break"></div>
       match.competition ? `Competition: ${match.competition}` : '',
       match.venue       ? `Venue: ${match.venue}`             : '',
       ``,
+      hasAnyInsight ? `📊 MATCH INSIGHTS\n─────────────────\n${insightLines}\n` : '',
       flaggedEvents.length ? `🚩 REVIEW ITEMS (${flaggedEvents.length})\n─────────────────\n${flaggedLines}\n` : '',
       `OVERALL RATING: ${a.ratings?.overall || 'Not rated'}`,
       ``,
@@ -2628,6 +2892,8 @@ const PhaseModal = {
     this.phase         = phase;
     this.scrumResets   = 0;
     this.reset();
+    Timer.render();
+    Timer.renderControls();
 
     const cfg = PHASES[phase];
     document.getElementById('pm-title').textContent = phase;

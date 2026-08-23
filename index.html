@@ -387,6 +387,14 @@
       <div class="phase-modal" id="phase-modal">
         <div class="pm-title" id="pm-title">Ruck</div>
 
+        <!-- Game clock — visible while this modal covers the live-match screen,
+             so the referee can see time and pause it without closing out first -->
+        <div class="pm-clock-bar">
+          <span id="pm-clock-time" class="pm-clock-time">00:00</span>
+          <span id="pm-clock-phase-badge" class="live-phase-badge"></span>
+          <button id="pm-clock-btn" class="pm-clock-btn" onclick="Timer.toggle()">Pause</button>
+        </div>
+
         <!-- Team selector + position on field — hidden for free-text phases (Critical, Comment) -->
         <div id="pm-team-position-section">
           <div class="pm-section-label">Possession / Attacking Team</div>
