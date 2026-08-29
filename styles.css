@@ -1112,7 +1112,24 @@ html, body {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px;
 }
+.insight-suggestion-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.insight-dismiss-btn {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: var(--surface2); color: var(--text2);
+  font-size: 15px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, color 0.12s;
+}
+.insight-dismiss-btn:active { background: var(--danger-soft); color: var(--danger); }
 .insight-suggestion-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+.insight-restore-btn {
+  width: 100%; padding: 9px;
+  background: none; border: 1.5px dashed var(--border2); border-radius: var(--radius-xs);
+  color: var(--text2); font-size: 12px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.insight-restore-btn:active { background: var(--surface2); }
 .insight-trend {
   font-size: 13px; color: var(--text); line-height: 1.6;
   padding: 7px 2px; border-bottom: 1px solid var(--border);

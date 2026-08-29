@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 
 // ══════════════════════════════════════════════════════════
 //  UTILS
@@ -254,10 +254,11 @@ function computeMatchInsights(match) {
     flaggedCount,
   };
 
-  const suggestions = [];
+  const rawSuggestions = [];
 
   if (setPieceInfringements >= 3) {
-    suggestions.push({
+    rawSuggestions.push({
+      key:  'setpiece-infringements',
       area: 'setpiece',
       text: `${setPieceInfringements} set-piece infringements logged across scrum/lineout/maul — worth reviewing engagement timing and detail at these phases.`
     });
@@ -268,7 +269,8 @@ function computeMatchInsights(match) {
     const less = Math.min(pkAgainst.home, pkAgainst.away);
     if (less === 0 || more / Math.max(less, 1) >= 2.5) {
       const skewedTeam = pkAgainst.home > pkAgainst.away ? hn : an;
-      suggestions.push({
+      rawSuggestions.push({
+        key:  'consistency-imbalance',
         area: 'consistency',
         text: `Penalties were heavily skewed toward ${skewedTeam} (${pkAgainst.home}–${pkAgainst.away}) — worth reflecting on whether the same standard was applied to both teams.`
       });
@@ -276,27 +278,36 @@ function computeMatchInsights(match) {
   }
 
   if (cards.yellow + cards.blue + cards.red > 0) {
-    suggestions.push({
+    rawSuggestions.push({
+      key:  'gamecontrol-cards',
       area: 'gamecontrol',
       text: `${cards.yellow} yellow, ${cards.blue} blue, ${cards.red} red card(s) issued — worth noting whether warnings or captain conversations were used before cards became necessary.`
     });
   }
 
   if (topInfringementEntry && topInfringementEntry[1] >= 4) {
-    suggestions.push({
+    rawSuggestions.push({
+      key:  'laws-repeated',
       area: 'laws',
       text: `"${topInfringementEntry[0]}" was called ${topInfringementEntry[1]} times, more than any other infringement — a specific law area worth focusing development on.`
     });
   }
 
   if (flaggedCount >= 1) {
-    suggestions.push({
+    rawSuggestions.push({
+      key:  'communication-flagged',
       area: 'communication',
       text: `${flaggedCount} moment${flaggedCount > 1 ? 's' : ''} flagged for review during the match — these are often useful starting points for the post-match conversation.`
     });
   }
 
-  return { stats, suggestions, ratings: a.ratings || {} };
+  // Suggestions the coach has dismissed as not applicable stay dismissed
+  // wherever insights are shown (report screen, print, email) — but
+  // don't affect the stats, which are just facts, not opinions.
+  const dismissed = new Set(match.dismissedInsights || []);
+  const suggestions = rawSuggestions.filter(s => !dismissed.has(s.key));
+
+  return { stats, suggestions, dismissedCount: rawSuggestions.length - suggestions.length, ratings: a.ratings || {} };
 }
 
 // Looks at a referee's assessed match history (including the current
@@ -1829,6 +1840,26 @@ const App = {
     }
   },
 
+  // Removes one suggestion (by its rule key) from this match's Match
+  // Insights permanently — it won't reappear on the report screen, in
+  // print/PDF, or in the emailed report, since computeMatchInsights()
+  // filters against match.dismissedInsights every time it runs.
+  dismissInsight(matchId, key) {
+    const match = State.getMatch(matchId);
+    if (!match) return;
+    const dismissed = new Set(match.dismissedInsights || []);
+    dismissed.add(key);
+    State.updateMatch(matchId, { dismissedInsights: [...dismissed] });
+    this.toast('Suggestion removed from report');
+    this.renderReport();
+  },
+
+  restoreInsights(matchId) {
+    State.updateMatch(matchId, { dismissedInsights: [] });
+    this.toast('Suggestions restored');
+    this.renderReport();
+  },
+
   renderReport() {
     const match = State.getMatch(this.currentMatchId);
     if (!match) return;
@@ -1913,7 +1944,7 @@ const App = {
     // cross-match trends for this referee if they have enough history ──
     const insights  = computeMatchInsights(match);
     const trendData = computeRefereeTrends(match.refereeId);
-    const hasAnyInsight = insights.stats.totalEvents > 0 || insights.suggestions.length > 0 || (trendData && trendData.trends.length > 0);
+    const hasAnyInsight = insights.stats.totalEvents > 0 || insights.suggestions.length > 0 || insights.dismissedCount > 0 || (trendData && trendData.trends.length > 0);
 
     const insightStatsHtml = `
       <div class="insights-stats-grid">
@@ -1923,7 +1954,7 @@ const App = {
         <div class="insight-stat"><div class="insight-stat-val">${insights.stats.topInfringement ? escapeHtml(insights.stats.topInfringement.name) : '–'}</div><div class="insight-stat-label">Top Infringement</div></div>
       </div>`;
 
-    const insightSuggestionsHtml = insights.suggestions.length ? `
+    const insightSuggestionsHtml = (insights.suggestions.length || insights.dismissedCount) ? `
       <div class="insight-suggestions">
         <div class="insight-suggestions-label">Suggested Focus Areas</div>
         ${insights.suggestions.map(s => {
@@ -1932,11 +1963,15 @@ const App = {
           return `<div class="insight-suggestion">
             <div class="insight-suggestion-header">
               <span>${escapeHtml(areaLabel)}</span>
-              ${rating ? `<span class="rating-badge ${rating}">${escapeHtml(rating)}</span>` : ''}
+              <span class="insight-suggestion-actions">
+                ${rating ? `<span class="rating-badge ${rating}">${escapeHtml(rating)}</span>` : ''}
+                <button class="insight-dismiss-btn" onclick="App.dismissInsight('${match.id}','${s.key}')" aria-label="Remove this suggestion from the report" title="Don't agree? Remove from report">×</button>
+              </span>
             </div>
             <div class="insight-suggestion-text">${escapeHtml(s.text)}</div>
           </div>`;
         }).join('')}
+        ${insights.dismissedCount > 0 ? `<button class="insight-restore-btn" onclick="App.restoreInsights('${match.id}')">↺ ${insights.dismissedCount} suggestion${insights.dismissedCount > 1 ? 's' : ''} removed — tap to restore</button>` : ''}
       </div>` : '';
 
     const insightTrendsHtml = (trendData && trendData.trends.length) ? `
